@@ -9,6 +9,12 @@ To build the tool:
 cargo build
 ```
 
+or
+
+```
+cargo run
+```
+
 To format code:
 ```
 cargo fmt
