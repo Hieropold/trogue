@@ -7,6 +7,7 @@ Command line tool to view the PSN trophies.
 To build the tool:
 ```
 cargo build
+cargo build --release
 ```
 
 or
