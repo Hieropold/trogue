@@ -1,3 +1,6 @@
 # Generated files
 /target/
 trophyroom
+
+# Ignore sensitive environment var values
+.vscode/launch.json
