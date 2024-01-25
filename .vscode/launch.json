@@ -1,0 +1,49 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'trophyroom'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=trophyroom",
+                    "--package=trophyroom"
+                ],
+                "filter": {
+                    "name": "trophyroom",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "TROPHYROOM_STEAM_API_KEY": "-",
+                "TROPHYROOM_STEAM_ID": "-"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'trophyroom'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=trophyroom",
+                    "--package=trophyroom"
+                ],
+                "filter": {
+                    "name": "trophyroom",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
