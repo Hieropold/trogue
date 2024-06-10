@@ -1,10 +1,10 @@
-pub mod environment;
+pub mod cfg;
 pub mod steam_api;
 pub mod ui;
 
 fn main() {
-    let api_key = environment::read_env("TROPHYROOM_STEAM_API_KEY");
-    let steam_id = environment::read_env("TROPHYROOM_STEAM_ID");
+    let api_key = cfg::read_env("TROPHYROOM_STEAM_API_KEY");
+    let steam_id = cfg::read_env("TROPHYROOM_STEAM_ID");
 
     ui::print_title();
 
