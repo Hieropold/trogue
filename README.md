@@ -1,6 +1,6 @@
 # Trophyroom
 
-Command line tool to view the PSN trophies.
+Command line tool to view the Steam achievements.
 
 # Configure
 
