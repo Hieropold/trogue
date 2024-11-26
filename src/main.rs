@@ -26,6 +26,64 @@ fn main() {
     let selected_game = select_game(&games).unwrap();
 
     println!("Selected game: {}", selected_game.name);
+
+    let mut achievements = Vec::new();
+    match api.get_game_achievements(selected_game.appid) {
+        Ok(resp) => achievements = resp,
+        Err(e) => eprintln!("Error while trying to get achievements: {}", e),
+    }
+
+    achievements.sort_by(|a, b| a.apiname.cmp(&b.apiname));
+
+    for achievement in achievements {
+        let mut achieved = "N";
+        if achievement.achieved == 1 {
+            achieved = "Y";
+        }
+        println!("{}: {}", achievement.apiname, achieved);
+    }
+
+    // loop {
+    //     print!("Please select achievement [1 - {}]: ", achievements.len());
+    //     io::stdout().flush().map_err(|e| e.to_string())?;
+
+    //     let mut input = String::new();
+    //     io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+
+    //     let selected_achievement = match input.trim().parse::<usize>() {
+    //         Ok(idx) => {
+    //             if idx > 0 && idx <= achievements.len() {
+    //                 &achievements[idx - 1]
+    //             } else {
+    //                 continue;
+    //             }
+    //         }
+    //         Err(_) => continue,
+    //     };
+
+    //     println!("Selected achievement: {}", selected_achievement.name);
+
+    //     match api.get_achievement_progress(selected_achievement.api_name.clone()) {
+    //         Ok(resp) => {
+    //             let progress = resp;
+    //             println!("Progress: {}", progress.progress);
+    //         }
+    //         Err(e) => eprintln!("Error while trying to get achievement progress: {}", e),
+    // }
+
+
+            // ui::print_achievements(&achievements);
+
+            // let selected_achievement = select_achievement(&achievements).unwrap();
+
+            // println!("Selected achievement: {}", selected_achievement.name);
+
+            // match api.get_achievement_progress(selected_achievement.api_name.clone()) {
+            //     Ok(resp) => {
+            //         let progress = resp;
+            //         println!("Progress: {}", progress.progress);
+            //     }
+            //     Err(e) => eprintln!("Error while trying to get achievement progress: {}", e),
 }
 
 fn select_game(games: &Vec<steam_api::Game>) -> Result<&steam_api::Game, String> {
