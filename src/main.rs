@@ -36,11 +36,7 @@ fn main() {
     achievements.sort_by(|a, b| a.apiname.cmp(&b.apiname));
 
     for achievement in achievements {
-        let mut achieved = "N";
-        if achievement.achieved == 1 {
-            achieved = "Y";
-        }
-        println!("{}: {}", achievement.apiname, achieved);
+        println!("{}", achievement.render_card())
     }
 
     // loop {
