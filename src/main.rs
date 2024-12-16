@@ -3,7 +3,8 @@ pub mod steam_api;
 pub mod ui;
 
 use std::process;
-use std::io::{self, Write};
+use std::io::{self, stdout, Read, Write};
+use crossterm::{cursor, execute, terminal, event::Event, event::KeyCode};
 
 fn main() {
     let mut cfg = cfg::Cfg::new();
@@ -23,9 +24,10 @@ fn main() {
         Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
     }
 
-    let selected_game = select_game(&games).unwrap();
+    // let selected_game = select_game(&games).unwrap();
+    select_game(&games);
 
-    println!("Selected game: {}", selected_game.name);
+    /*println!("Selected game: {}", selected_game.name);
 
     let mut achievements = Vec::new();
     match api.get_game_achievements(selected_game.appid) {
@@ -37,7 +39,7 @@ fn main() {
 
     for achievement in achievements {
         println!("{}", achievement.render_card())
-    }
+    }*/
 
     // loop {
     //     print!("Please select achievement [1 - {}]: ", achievements.len());
@@ -82,42 +84,88 @@ fn main() {
             //     Err(e) => eprintln!("Error while trying to get achievement progress: {}", e),
 }
 
-fn select_game(games: &Vec<steam_api::Game>) -> Result<&steam_api::Game, String> {
-    println!("Steam games:");
-    let mut idx = 0;
-    for game in games {
-        idx += 1;
-        println!("[{}] {}", idx, game.name);
-    }
+// fn select_game(games: &Vec<steam_api::Game>) -> Result<&steam_api::Game, String> {
+fn select_game(games: &Vec<steam_api::Game>) {
+    // let mut idx = 0;
+    // for game in games {
+    //     idx += 1;
+    //     println!("[{}] {}", idx, game.name);
+    // }
+
+    let mut name_filter = String::new();
+
+    // Initialize term to enter raw mode
+    terminal::enable_raw_mode().expect("Failed to enable terminal raw mode");
+
+    // Clear terminal screen
+    execute!(stdout(), cursor::MoveTo(0, 0), terminal::Clear(terminal::ClearType::All)).unwrap();
 
     loop {
-        print!("Please select game [1 - {}]: ", idx);
-        io::stdout().flush().map_err(|e| e.to_string())?;
+        // io::stdout().flush().map_err(|e| e.to_string())?;
 
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+        // io::stdin().read_line(&mut name_filter).map_err(|e| e.to_string())?;
 
-        let entered_idx = match input.trim().parse::<i32>() {
-            Ok(num) if num >= 1 && num <= idx => {
-                num
-            }
-            Ok(_) => {
-                println!("Error: Number not in range 1-{}.", idx);
-                -1
-            }
-            Err(_) => {
-                println!("Error: Invalid input. Please enter an integer.");
-                -1
-            }
-        };
+        // io::stdin().read_to_string(name_filter).map_err(|e| e.to_string());
 
-        if entered_idx == -1 {
+        // name_filter = name_filter.trim().to_string();
+
+        /*let mut filtered_games = games.iter().filter(|game| {
+            if name_filter.len() == 0 {
+                return true;
+            }
+            return game.name.to_lowercase().contains(&name_filter.to_lowercase());
+        }).collect::<Vec<&steam_api::Game>>();
+
+        if filtered_games.len() == 0 {
+            println!("No games found.");
             continue;
+        }*/
+
+        // Read the next event from the terminal
+        if let Event::Key(key_event) = crossterm::event::read().expect("Failed to read key event") {
+            match key_event.code {
+                KeyCode::Char(c) => {
+                    // Append the character to the filter
+                    name_filter.push(c);
+                }
+                KeyCode::Backspace => {
+                    // Remove the last character from the filter
+                    name_filter.pop();
+                }
+                KeyCode::Esc | KeyCode::Enter => {
+                    break;
+                }
+                _ => {}
+            }
         }
+
+        execute!(stdout(), cursor::MoveTo(0, 0), terminal::Clear(terminal::ClearType::All)).unwrap();
+        print!("{}\n", name_filter);
+
+        // Filter the games based on the current filter input
+        let mut filtered_games = games.clone();
+        filtered_games.retain(|entry| entry.name.to_lowercase().contains(&name_filter.to_lowercase()));
+
+        // Print out the filtered list
+        let mut idx = 0;
+        for game in filtered_games {
+            idx += 1;
+            execute!(stdout(), cursor::MoveTo(0, idx)).unwrap();
+            println!("{}", game.name);
+        }
+
+        // Move the cursor to end of first line
+        let name_length: u16 = name_filter.len().try_into().expect("Name length too long to fit into u16");
+        execute!(stdout(), cursor::MoveTo(name_length, 0)).unwrap();
+    }
+
+    // Reset terminal mode
+    terminal::disable_raw_mode().expect("Failed to disable the raw mode");
+}
+
+        /*print!("Please select game [1 - {}]: ", filtered_games.len());
+        io::stdout().flush().map_err(|e| e.to_string())?;
 
         let game = games.get(entered_idx as usize - 1).ok_or("Invalid game index.")?;
 
-        return Ok(game);
-    }
-
-}
+        return Ok(game);*/

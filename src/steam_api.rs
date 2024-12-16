@@ -14,7 +14,7 @@ struct GamesList {
     games: Vec<Game>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Game {
     pub appid: u32,
     pub name: String,
