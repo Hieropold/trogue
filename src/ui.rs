@@ -1,3 +1,5 @@
+use crate::steam_api::Game;
+
 pub fn print_title() {
     let title = r#"                                                                                                                                       
   ****           *                                      *                                                                          
@@ -22,4 +24,8 @@ pub fn print_title() {
 "#;
 
     println!("{title}");
+}
+
+pub fn print_game_title(game: &Game) {
+  println!("{}", game.name);
 }
