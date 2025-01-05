@@ -39,6 +39,18 @@ fn main() {
                 .num_args(0..=1)
                 .help("Displays a list of all games on account set in environment variables"),
         )
+        .arg(
+            Arg::new("pattern")
+                .short('p')
+                .long("pattern")
+                .help(r#"Specifies the output format for the list command. It can be used only with --list command. By default, only the game name is displayed.
+Possible tokens are:
+    n - game name
+    i - game id
+E.g.: -p "i: n""#)
+                .requires("list")
+                .value_name("pattern"),
+        )
         .get_matches();
 
     if cli_matches.get_flag("banner") {
@@ -48,7 +60,8 @@ fn main() {
 
     if cli_matches.contains_id("list") {
         let filter = cli_matches.get_one::<String>("list").cloned();
-        list_games(filter);
+        let format = cli_matches.get_one::<String>("pattern").cloned();
+        list_games(filter, format);
     }
 
     return;
@@ -123,11 +136,12 @@ fn main() {
     //     Err(e) => eprintln!("Error while trying to get achievement progress: {}", e),
 }
 
-fn list_games(filter: Option<String>) {
+fn list_games(filter: Option<String>, optional_pattern: Option<String>) {
     // Load all games
     let cfg = load_cfg();
     let api = steam_api::Api::new(cfg.api_key().to_string(), cfg.steam_id().to_string());
     let mut games = Vec::new();
+    
     match api.get_games_list() {
         Ok(resp) => games = resp,
         Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
@@ -143,8 +157,12 @@ fn list_games(filter: Option<String>) {
         }
     }
 
+    let pattern = optional_pattern.unwrap_or("n".to_string());
+
     for game in games {
-        ui::print_game_title(&game);
+        let displayable_game = ui::DisplayableGame { game };
+        let formatted_game = displayable_game.format(&pattern);
+        println!("{}", formatted_game);
     }
 }
 
