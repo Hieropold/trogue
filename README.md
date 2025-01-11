@@ -8,6 +8,15 @@ Configuration is done through environment:
 * `TROPHYROOM_STEAM_API_KEY`
 * `TROPHYROOM_STEAM_ID`
 
+# Usage
+
+Some possible usage examples:
+* `trophyroom -l` will list all games in the library, outputting game names only
+* `trophyroom -l dragon -p 'i - n'` will list games containing "dragon" in the name, and output game id and game name separated by hyphen
+* `trophyroom -a 48700` will display achievements for a specific game
+
+Run `trophyroom -h` for a full list of available options.
+
 # Build
 
 To build the tool:
