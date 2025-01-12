@@ -49,7 +49,11 @@ impl App {
 
         for achievement in achievements {
             let displayable_achievement = ui::DisplayableAchievement { achievement };
-            println!("{}", displayable_achievement.render_card())
+            if displayable_achievement.achievement.achieved > 0 {
+                println!("{}", displayable_achievement.format("n - s (t)"));
+            } else {
+                println!("{}", displayable_achievement.format("n"));
+            }
         }
     }
 }

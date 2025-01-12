@@ -80,7 +80,6 @@ E.g.: -p "i: n""#)
         let game_id_str = cli_matches.get_one::<String>("achievements").unwrap();
         if let Ok(game_id) = game_id_str.parse::<u32>() {
             app.list_achievements(game_id);
-            println!("{}", game_id);
         } else {
             eprintln!("Invalid game id: {}", game_id_str);
         }

@@ -61,6 +61,21 @@ pub struct DisplayableAchievement {
 }
 
 impl DisplayableAchievement {
+    pub fn format(&self, pattern: &str) -> String {
+        let mut result = String::new();
+
+        for ch in pattern.chars() {
+            match ch {
+                'n' => result.push_str(&self.achievement.apiname),
+                's' => result.push_str(if self.achievement.achieved > 0 { "Y" } else { "N" }),
+                't' => result.push_str(&self.formatted_unlocktime()),
+                _ => result.push(ch),
+            }
+        }
+
+        result
+    }
+
     pub fn render_card(&self) -> String {
         let mut card = String::new();
         let achieved = if self.achievement.achieved == 1 { "Y" } else { "N" };
