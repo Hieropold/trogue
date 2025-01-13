@@ -51,6 +51,22 @@ pub struct Achievement {
     pub description: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GlobalAchievementsResponse {
+    pub achievementpercentages: GlobalAchievements,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GlobalAchievements {
+    pub achievements: Vec<GlobalAchievement>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GlobalAchievement {
+    pub name: String,
+    pub percent: f32,
+}
+
 pub struct Api {
     api_key: String,
     steam_id: String,
@@ -98,6 +114,25 @@ impl Api {
         if response.status().is_success() {
             let data: PlayerStatsResponse = response.json().await?;
             return Ok(data.playerstats.achievements);
+        } else {
+            eprintln!("Failed to fetch data: {}", response.status());
+        }
+
+        Ok(Vec::new())
+    }
+
+    #[tokio::main]
+    pub async fn get_global_achievements(&self, appid: u32) -> Result<Vec<GlobalAchievement>, reqwest::Error> {
+        // Global achievements
+        let url = format!("http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid={appid}&format=json&l=en");
+
+        // Send the GET request
+        let response = reqwest::get(url).await?;
+
+        // Check if the request was successful and parse the JSON
+        if response.status().is_success() {
+            let data: GlobalAchievementsResponse = response.json().await?;
+            return Ok(data.achievementpercentages.achievements);
         } else {
             eprintln!("Failed to fetch data: {}", response.status());
         }

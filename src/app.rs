@@ -39,7 +39,7 @@ impl App {
         }
     }
 
-    pub fn list_achievements(&self, game_id: u32) {
+    pub fn list_achievements(&self, game_id: u32, add_global: bool) {
         let mut achievements = Vec::new();
 
         match &self.api.get_game_achievements(game_id) {
@@ -53,6 +53,18 @@ impl App {
                 println!("{}", displayable_achievement.format("n - s (t)"));
             } else {
                 println!("{}", displayable_achievement.format("n"));
+            }
+        }
+
+        if add_global {
+            match &self.api.get_global_achievements(game_id) {
+                Ok(resp) => {
+                    for global_achievement in resp {
+                        println!("{}", global_achievement.name);
+                    println!("{} - {}%", global_achievement.name, global_achievement.percent);
+                    }
+                }
+                Err(e) => eprintln!("Error while trying to get global achievements: {}", e),
             }
         }
     }

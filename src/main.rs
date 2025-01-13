@@ -57,8 +57,17 @@ E.g.: -p "i: n""#)
                 .long("achievements")
                 .value_name("achievements")
                 .action(clap::ArgAction::Set)
-                .num_args(1)
+                .num_args(0..=1)
                 .help("Displays achievements for a specific game. Game id should be provided as an argument"),
+        )
+        .arg(
+            Arg::new("global-achievements")
+                .short('g')
+                .long("global-achievements")
+                .value_name("global_achievements")
+                .requires("achievements")
+                .action(clap::ArgAction::SetTrue)
+                .help("Adds global achievement percentages for the output of game achievements. This flag can be used only with --achievements command"),
         )
         .get_matches();
 
@@ -78,8 +87,9 @@ E.g.: -p "i: n""#)
 
     if cli_matches.contains_id("achievements") {
         let game_id_str = cli_matches.get_one::<String>("achievements").unwrap();
+        let add_global = cli_matches.get_flag("global-achievements");
         if let Ok(game_id) = game_id_str.parse::<u32>() {
-            app.list_achievements(game_id);
+            app.list_achievements(game_id, add_global);
         } else {
             eprintln!("Invalid game id: {}", game_id_str);
         }
