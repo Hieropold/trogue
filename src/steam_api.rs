@@ -47,6 +47,8 @@ pub struct Achievement {
     pub apiname: String,
     pub achieved: u8,
     pub unlocktime: u64,
+    pub name: String,
+    pub description: String,
 }
 
 pub struct Api {
@@ -87,7 +89,7 @@ impl Api {
         let steam_id = self.steam_id.clone();
 
         // Game achievements
-        let url = format!("http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={api_key}&steamid={steam_id}");
+        let url = format!("http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={api_key}&steamid={steam_id}&l=en");
 
         // Send the GET request
         let response = reqwest::get(url).await?;

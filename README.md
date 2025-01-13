@@ -44,6 +44,7 @@ cargo clippy
 # Development
 
 ## Steam
+https://developer.valvesoftware.com/wiki/Steam_Web_API
 
 ## PSN
 https://andshrew.github.io/PlayStation-Trophies/#/APIv2
@@ -53,8 +54,8 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 
 # Roadmap
 
-- [ ] Achievement card - name, status, date, progress
-- [ ] CLI mode additionally to interactive mode
+- [x] Achievement card - name, status, date, progress
+- [x] CLI mode additionally to interactive mode
 - [ ] Game name search with typeahead in interactive mode
 - [ ] Game name tab completion in CLI mode
 - [ ] Add support for PSN

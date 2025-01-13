@@ -66,7 +66,9 @@ impl DisplayableAchievement {
 
         for ch in pattern.chars() {
             match ch {
-                'n' => result.push_str(&self.achievement.apiname),
+                'i' => result.push_str(&self.achievement.apiname),
+                'n' => result.push_str(&self.achievement.name),
+                'd' => result.push_str(&self.achievement.description),
                 's' => result.push_str(if self.achievement.achieved > 0 { "Y" } else { "N" }),
                 't' => result.push_str(&self.formatted_unlocktime()),
                 _ => result.push(ch),
