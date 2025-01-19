@@ -60,3 +60,16 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 - [ ] Game name tab completion in CLI mode
 - [ ] Add support for PSN
 - [ ] Add support for Xbox
+
+# Alternative names
+* Ludovictor
+* Achievolus
+* Proludium
+* Ludotorium
+* Achiever
+* Trophty
+* Trophaeum
+* atk - achievement toolkit
+* atlkt - achievement toolkit
+* gmslb - games library
+* gamelib - games library
