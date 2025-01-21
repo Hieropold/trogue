@@ -47,24 +47,43 @@ impl App {
             Err(e) => eprintln!("Error while trying to get achievements: {}", e),
         }
 
-        for achievement in achievements {
-            let displayable_achievement = ui::DisplayableAchievement { achievement };
-            if displayable_achievement.achievement.achieved > 0 {
-                println!("{}", displayable_achievement.format("n - s (t)"));
-            } else {
-                println!("{}", displayable_achievement.format("n"));
-            }
-        }
-
+        let mut global_achievement_map = std::collections::HashMap::new();
         if add_global {
             match &self.api.get_global_achievements(game_id) {
                 Ok(resp) => {
                     for global_achievement in resp {
-                        println!("{}", global_achievement.name);
-                    println!("{} - {}%", global_achievement.name, global_achievement.percent);
+                        global_achievement_map
+                            .insert(global_achievement.name.clone(), global_achievement.percent);
                     }
                 }
                 Err(e) => eprintln!("Error while trying to get global achievements: {}", e),
+            }
+        }
+
+        for achievement in achievements {
+            let displayable_achievement = ui::DisplayableAchievement { achievement };
+            if displayable_achievement.achievement.achieved > 0 {
+                if add_global {
+                    let global_percent = global_achievement_map
+                        .get(&displayable_achievement.achievement.apiname)
+                        .unwrap_or(&0.0);
+                    println!(
+                        "{} {}%",
+                        displayable_achievement.format("n - s (t)"),
+                        global_percent
+                    );
+                } else {
+                    println!("{}", displayable_achievement.format("n - s (t)"));
+                }
+            } else {
+                if add_global {
+                    let global_percent = global_achievement_map
+                        .get(&displayable_achievement.achievement.apiname)
+                        .unwrap_or(&0.0);
+                    println!("{} {}%", displayable_achievement.format("n"), global_percent);
+                } else {
+                    println!("{}", displayable_achievement.format("n"));
+                }
             }
         }
     }
