@@ -39,7 +39,7 @@ impl App {
         }
     }
 
-    pub fn list_achievements(&self, game_id: u32, add_global: bool) {
+    pub fn list_achievements(&self, game_id: u32, add_global: bool, remaining: bool) {
         let mut achievements = Vec::new();
 
         match &self.api.get_game_achievements(game_id) {
@@ -61,30 +61,30 @@ impl App {
         }
 
         for achievement in achievements {
-            let displayable_achievement = ui::DisplayableAchievement { achievement };
-            if displayable_achievement.achievement.achieved > 0 {
-                if add_global {
-                    let global_percent = global_achievement_map
-                        .get(&displayable_achievement.achievement.apiname)
-                        .unwrap_or(&0.0);
-                    println!(
-                        "{} {}%",
-                        displayable_achievement.format("n - s (t)"),
-                        global_percent
-                    );
-                } else {
-                    println!("{}", displayable_achievement.format("n - s (t)"));
-                }
-            } else {
-                if add_global {
-                    let global_percent = global_achievement_map
-                        .get(&displayable_achievement.achievement.apiname)
-                        .unwrap_or(&0.0);
-                    println!("{} {}%", displayable_achievement.format("n"), global_percent);
-                } else {
-                    println!("{}", displayable_achievement.format("n"));
-                }
+            // Skip achieved achievements if we only want to display remaining ones
+            if remaining && achievement.achieved > 0 {
+                continue;
             }
+
+            let displayable_achievement = ui::DisplayableAchievement { achievement };
+
+            let mut title: String;
+            if displayable_achievement.achievement.achieved > 0 {
+                title = displayable_achievement.format("n - s (t)");
+            } else {
+                title = displayable_achievement.format("n");
+            }
+
+            // Add global percentage to the output if requested
+            if add_global {
+                let global_percent = global_achievement_map
+                        .get(&displayable_achievement.achievement.apiname)
+                        .unwrap_or(&0.0);
+
+                title.push_str(&format!(" {}%", global_percent));
+            }
+
+            println!("{}", title);
         }
     }
 }

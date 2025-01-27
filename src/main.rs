@@ -1,7 +1,7 @@
+pub mod app;
 pub mod cfg;
 pub mod steam_api;
 pub mod ui;
-pub mod app;
 
 use cfg::Cfg;
 use clap::{Arg, Command};
@@ -69,6 +69,15 @@ E.g.: -p "i: n""#)
                 .action(clap::ArgAction::SetTrue)
                 .help("Adds global achievement percentages for the output of game achievements. This flag can be used only with --achievements command"),
         )
+        .arg(
+            Arg::new("remaining")
+                .short('r')
+                .long("remaining")
+                .value_name("remaining")
+                .requires("achievements")
+                .action(clap::ArgAction::SetTrue)
+                .help("Displays only remaining locked achievements. This flag can be used only with --achievements command"),
+        )
         .get_matches();
 
     let cfg = load_cfg();
@@ -88,8 +97,9 @@ E.g.: -p "i: n""#)
     if cli_matches.contains_id("achievements") {
         let game_id_str = cli_matches.get_one::<String>("achievements").unwrap();
         let add_global = cli_matches.get_flag("global");
+        let remaining = cli_matches.get_flag("remaining");
         if let Ok(game_id) = game_id_str.parse::<u32>() {
-            app.list_achievements(game_id, add_global);
+            app.list_achievements(game_id, add_global, remaining);
         } else {
             eprintln!("Invalid game id: {}", game_id_str);
         }
