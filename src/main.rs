@@ -43,7 +43,7 @@ fn main() {
             Arg::new("pattern")
                 .short('p')
                 .long("pattern")
-                .help(r#"Specifies the output format for the list command. It can be used only with --list command. By default, only the game name is displayed.
+                .help(r#"Specifies the output format for the list command. It can be used only with --list command. By default, the game id and name are displayed.
 Possible tokens are:
     n - game name
     i - game id
@@ -78,6 +78,15 @@ E.g.: -p "i: n""#)
                 .action(clap::ArgAction::SetTrue)
                 .help("Displays only remaining locked achievements. This flag can be used only with --achievements command"),
         )
+        .arg(
+            Arg::new("progress-summary")
+                .short('s')
+                .long("progress-summary")
+                .value_name("progress_summary")
+                .requires("achievements")
+                .action(clap::ArgAction::SetTrue)
+                .help("Displays game achievements progress. This flag can be used only with --achievements command"),
+        )
         .get_matches();
 
     let cfg = load_cfg();
@@ -98,8 +107,13 @@ E.g.: -p "i: n""#)
         let game_id_str = cli_matches.get_one::<String>("achievements").unwrap();
         let add_global = cli_matches.get_flag("global");
         let remaining = cli_matches.get_flag("remaining");
+        let progress = cli_matches.get_flag("progress-summary");
         if let Ok(game_id) = game_id_str.parse::<u32>() {
-            app.list_achievements(game_id, add_global, remaining);
+            if progress {
+                app.show_progress(game_id);
+            } else {
+                app.list_achievements(game_id, add_global, remaining);
+            }
         } else {
             eprintln!("Invalid game id: {}", game_id_str);
         }

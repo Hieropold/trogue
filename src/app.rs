@@ -30,7 +30,7 @@ impl App {
             }
         }
 
-        let pattern = optional_pattern.unwrap_or("n".to_string());
+        let pattern = optional_pattern.unwrap_or("[i] n".to_string());
 
         for game in games {
             let displayable_game = ui::DisplayableGame { game };
@@ -39,11 +39,51 @@ impl App {
         }
     }
 
+    pub fn show_progress(&self, game_id: u32) {
+        let mut achievements = Vec::new();
+        let mut game_name = String::new();
+
+        match &self.api.get_game_achievements(game_id) {
+            Ok((name, achs)) => {
+                game_name = name.clone();
+                achievements = achs.clone();
+            },
+            Err(e) => eprintln!("Error while trying to get achievements: {}", e)
+        }
+
+        println!("{}", game_name);
+
+        if achievements.is_empty() {
+            println!("No achievements found for this game");
+            return;
+        }
+
+        let total = achievements.len();
+        let completed = achievements.iter().filter(|a| a.achieved > 0).count();
+        let percentage = (completed as f32 / total as f32) * 100.0;
+
+        // Get terminal width and use 50% of it for the progress bar
+        let terminal_width = crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
+        let bar_width = terminal_width / 2;
+        
+        let filled_chars = ((percentage / 100.0) * bar_width as f32).round() as usize;
+        let empty_chars = bar_width - filled_chars;
+
+        print!("[");
+        for _ in 0..filled_chars {
+            print!("█");
+        }
+        for _ in 0..empty_chars {
+            print!(" ");
+        }
+        println!("] {:.1}% ({}/{})", percentage, completed, total);
+    }
+
     pub fn list_achievements(&self, game_id: u32, add_global: bool, remaining: bool) {
         let mut achievements = Vec::new();
 
         match &self.api.get_game_achievements(game_id) {
-            Ok(resp) => achievements = resp.clone(),
+            Ok((_, achs)) => achievements = achs.clone(),
             Err(e) => eprintln!("Error while trying to get achievements: {}", e),
         }
 

@@ -100,7 +100,7 @@ impl Api {
     }
 
     #[tokio::main]
-    pub async fn get_game_achievements(&self, appid: u32) -> Result<Vec<Achievement>, reqwest::Error> {
+    pub async fn get_game_achievements(&self, appid: u32) -> Result<(String, Vec<Achievement>), reqwest::Error> {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
 
@@ -113,14 +113,13 @@ impl Api {
         // Check if the request was successful and parse the JSON
         if response.status().is_success() {
             let data: PlayerStatsResponse = response.json().await?;
-            return Ok(data.playerstats.achievements);
+            return Ok((data.playerstats.game_name, data.playerstats.achievements));
         } else {
             eprintln!("Failed to fetch data: {}", response.status());
         }
 
-        Ok(Vec::new())
+        Ok((String::new(), Vec::new()))
     }
-
     #[tokio::main]
     pub async fn get_global_achievements(&self, appid: u32) -> Result<Vec<GlobalAchievement>, reqwest::Error> {
         // Global achievements
