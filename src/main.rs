@@ -87,6 +87,13 @@ E.g.: -p "i: n""#)
                 .action(clap::ArgAction::SetTrue)
                 .help("Displays game achievements progress. This flag can be used only with --achievements command"),
         )
+        .arg(
+            Arg::new("dashboard")
+                .short('d')
+                .long("dashboard")
+                .action(clap::ArgAction::SetTrue)
+                .help("Displays a dashboard with 10 last played games and their achievement progress"),
+        )
         .get_matches();
 
     let cfg = load_cfg();
@@ -101,6 +108,7 @@ E.g.: -p "i: n""#)
         let filter = cli_matches.get_one::<String>("list").cloned();
         let format = cli_matches.get_one::<String>("pattern").cloned();
         app.list_games(filter, format);
+        return;
     }
 
     if cli_matches.contains_id("achievements") {
@@ -117,6 +125,12 @@ E.g.: -p "i: n""#)
         } else {
             eprintln!("Invalid game id: {}", game_id_str);
         }
+        return;
+    }
+
+    if cli_matches.get_flag("dashboard") {
+        app.show_dashboard();
+        return;
     }
 
     return;

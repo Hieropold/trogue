@@ -127,4 +127,32 @@ impl App {
             println!("{}", title);
         }
     }
+
+    pub fn show_dashboard(&self) {
+        let mut games = Vec::new();
+        match &self.api.get_games_list() {
+            Ok(resp) => games = resp.clone(),
+            Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
+        }
+
+        // Sort games by last played time (most recent first)
+        games.sort_by(|a, b| b.rtime_last_played.cmp(&a.rtime_last_played));
+
+        // Take only the 10 most recently played games
+        let recent_games: Vec<_> = games.iter().take(10).collect();
+
+        // Output title
+        let terminal_width = crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
+        let box_width = terminal_width / 2;
+        let title = "Recently Played Games Dashboard";
+        let padding = (box_width - title.len()) / 2;
+        
+        println!("{}", "=".repeat(box_width));
+        println!("{}{}{}", " ".repeat(padding), title, " ".repeat(padding));
+        println!("{}", "=".repeat(box_width));
+
+        for game in recent_games {
+            self.show_progress(game.appid);                
+        }
+    }
 }
