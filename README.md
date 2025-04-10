@@ -62,13 +62,7 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 - [ ] Add support for Xbox
 
 # Alternative names
-* Ludovictor
-* Achievolus
-* Proludium
-* Ludotorium
-* Achiever
-* Trophty
-* Trophaeum
+* trphlib - trophylib
 * atk - achievement toolkit
 * atlkt - achievement toolkit
 * gmslb - games library
