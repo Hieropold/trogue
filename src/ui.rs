@@ -2,6 +2,23 @@ use chrono::{TimeZone, Utc};
 
 use crate::steam_api::{Achievement, Game};
 
+/// Prints the application title to the console.
+///
+/// <purpose-start>
+/// This function is responsible for printing the application title to the console.
+/// <purpose-end>
+///
+/// <inputs-start>
+/// - None.
+/// <inputs-end>
+///
+/// <outputs-start>
+/// - None.
+/// <outputs-end>
+///
+/// <side-effects-start>
+/// - **Prints to the console**: The application title is printed to the standard output.
+/// <side-effects-end>
 pub fn print_title() {
     let title = r#"                                                                                                                                       
   ****           *                                      *                                                                          
@@ -28,19 +45,72 @@ pub fn print_title() {
     println!("{title}");
 }
 
+/// Prints the game title to the console.
+///
+/// <purpose-start>
+/// This function is responsible for printing the game title to the console.
+/// <purpose-end>
+///
+/// <inputs-start>
+/// - `game`: The `Game` struct to print the title of.
+/// <inputs-end>
+///
+/// <outputs-start>
+/// - None.
+/// <outputs-end>
+///
+/// <side-effects-start>
+/// - **Prints to the console**: The game title is printed to the standard output.
+/// <side-effects-end>
 pub fn print_game_title(game: &Game) {
     println!("{}", game.name);
 }
 
+/// Prints the game ID to the console.
+///
+/// <purpose-start>
+/// This function is responsible for printing the game ID to the console.
+/// <purpose-end>
+///
+/// <inputs-start>
+/// - `game`: The `Game` struct to print the ID of.
+/// <inputs-end>
+///
+/// <outputs-start>
+/// - None.
+/// <outputs-end>
+///
+/// <side-effects-start>
+/// - **Prints to the console**: The game ID is printed to the standard output.
+/// <side-effects-end>
 pub fn print_game_id(game: &Game) {
     println!("{}", game.appid);
 }
 
+/// A wrapper around the `Game` struct to provide display formatting.
 pub struct DisplayableGame {
     pub game: Game,
 }
 
 impl DisplayableGame {
+    /// Formats the game information according to a pattern.
+    ///
+    /// <purpose-start>
+    /// This function formats the game information into a string based on a provided pattern.
+    /// The pattern can contain tokens that are replaced with game data.
+    /// <purpose-end>
+    ///
+    /// <inputs-start>
+    /// - `pattern`: A string containing the format pattern.
+    /// <inputs-end>
+    ///
+    /// <outputs-start>
+    /// - `String`: The formatted string.
+    /// <outputs-end>
+    ///
+    /// <side-effects-start>
+    /// - None.
+    /// <side-effects-end>
     pub fn format(&self, pattern: &str) -> String {
         let mut result = String::new();
 
@@ -56,11 +126,30 @@ impl DisplayableGame {
     }
 }
 
+/// A wrapper around the `Achievement` struct to provide display formatting.
 pub struct DisplayableAchievement {
     pub achievement: Achievement,
 }
 
 impl DisplayableAchievement {
+    /// Formats the achievement information according to a pattern.
+    ///
+    /// <purpose-start>
+    /// This function formats the achievement information into a string based on a provided pattern.
+    /// The pattern can contain tokens that are replaced with achievement data.
+    /// <purpose-end>
+    ///
+    /// <inputs-start>
+    /// - `pattern`: A string containing the format pattern.
+    /// <inputs-end>
+    ///
+    /// <outputs-start>
+    /// - `String`: The formatted string.
+    /// <outputs-end>
+    ///
+    /// <side-effects-start>
+    /// - None.
+    /// <side-effects-end>
     pub fn format(&self, pattern: &str) -> String {
         let mut result = String::new();
 
@@ -78,6 +167,23 @@ impl DisplayableAchievement {
         result
     }
 
+    /// Renders a card-like representation of the achievement.
+    ///
+    /// <purpose-start>
+    /// This function creates a string that represents the achievement in a card-like format.
+    /// <purpose-end>
+    ///
+    /// <inputs-start>
+    /// - None.
+    /// <inputs-end>
+    ///
+    /// <outputs-start>
+    /// - `String`: The card-like representation of the achievement.
+    /// <outputs-end>
+    ///
+    /// <side-effects-start>
+    /// - None.
+    /// <side-effects-end>
     pub fn render_card(&self) -> String {
         let mut card = String::new();
         let achieved = if self.achievement.achieved == 1 { "Y" } else { "N" };
@@ -124,6 +230,23 @@ impl DisplayableAchievement {
         card
     }
 
+    /// Formats the unlock time into a human-readable string.
+    ///
+    /// <purpose-start>
+    /// This function converts the Unix timestamp of the achievement's unlock time into a formatted string.
+    /// <purpose-end>
+    ///
+    /// <inputs-start>
+    /// - None.
+    /// <inputs-end>
+    ///
+    /// <outputs-start>
+    /// - `String`: The formatted unlock time.
+    /// <outputs-end>
+    ///
+    /// <side-effects-start>
+    /// - None.
+    /// <side-effects-end>
     fn formatted_unlocktime(&self) -> String {
         let ts = self.achievement.unlocktime.try_into().unwrap();
         let datetime = Utc
