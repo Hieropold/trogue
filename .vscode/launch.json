@@ -21,10 +21,7 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}",
-            "env": {
-                "TROPHYROOM_STEAM_API_KEY": "-",
-                "TROPHYROOM_STEAM_ID": "-"
-            }
+            "envFile": "${workspaceFolder}/.env"
         },
         {
             "type": "lldb",

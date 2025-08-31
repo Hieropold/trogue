@@ -3,4 +3,4 @@
 trophyroom
 
 # Ignore sensitive environment var values
-.vscode/launch.json
+.env
