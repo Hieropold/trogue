@@ -1,4 +1,4 @@
-use crate::{cfg::Cfg, steam_api::Api};
+use crate::{cfg::Cfg, steam_api::Api, constants};
 
 /// The main application structure.
 ///
@@ -28,7 +28,11 @@ impl AppContext {
     /// - None.
     /// <side-effects-end>
     pub fn new(cfg: Cfg) -> AppContext {
-        let api = Api::new(cfg.api_key().to_string(), cfg.steam_id().to_string());
+        let api = Api::new(
+            cfg.api_key().to_string(),
+            cfg.steam_id().to_string(),
+            constants::STEAM_API_BASE_URL.to_string(),
+        );
 
         AppContext { api }
     }

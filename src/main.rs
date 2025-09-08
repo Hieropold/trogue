@@ -1,5 +1,6 @@
 pub mod app;
 pub mod cfg;
+pub mod constants;
 pub mod steam_api;
 pub mod ui;
 pub mod plugins;
@@ -56,7 +57,8 @@ fn load_cfg() -> Cfg {
 /// - **Prints to the console**: The output of the commands is printed to the standard output.
 /// - **Exits the process**: The process is terminated when the command has finished executing.
 /// <side-effects-end>
-fn main() {
+#[tokio::main]
+async fn main() {
     let cfg = load_cfg();
     let app_context = app::AppContext::new(cfg);
     let plugins = plugins::get_plugins();
@@ -74,7 +76,7 @@ fn main() {
 
     for plugin in &plugins {
         if let Some(sub_matches) = matches.subcommand_matches(plugin.command().get_name()) {
-            plugin.execute(&app_context, sub_matches);
+            plugin.execute(&app_context, sub_matches).await;
             return;
         }
     }

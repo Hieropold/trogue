@@ -19,10 +19,12 @@
 //! <side-effects-end>
 
 use crate::{app::AppContext, plugins::Plugin, ui};
+use async_trait::async_trait;
 use clap::{Arg, Command};
 
 pub struct ListAchievementsPlugin;
 
+#[async_trait]
 impl Plugin for ListAchievementsPlugin {
     /// Defines the clap command for the `achievements` plugin.
     ///
@@ -89,7 +91,7 @@ impl Plugin for ListAchievementsPlugin {
     /// - Makes network requests to the Steam API to fetch achievement data.
     /// - Prints the list of achievements to the console.
     /// <side-effects-end>
-    fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
+    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
         let game_id_str = matches.get_one::<String>("game_id").unwrap();
         let add_global = matches.get_flag("global");
         let remaining = matches.get_flag("remaining");
@@ -97,14 +99,14 @@ impl Plugin for ListAchievementsPlugin {
         if let Ok(game_id) = game_id_str.parse::<u32>() {
             let mut achievements = Vec::new();
 
-            match &app_context.api.get_game_achievements(game_id) {
-                Ok((_, achs)) => achievements = achs.clone(),
+            match app_context.api.get_game_achievements(game_id).await {
+                Ok((_, achs)) => achievements = achs,
                 Err(e) => eprintln!("Error while trying to get achievements: {}", e),
             }
 
             let mut global_achievement_map = std::collections::HashMap::new();
             if add_global {
-                match &app_context.api.get_global_achievements(game_id) {
+                match app_context.api.get_global_achievements(game_id).await {
                     Ok(resp) => {
                         for global_achievement in resp {
                             global_achievement_map

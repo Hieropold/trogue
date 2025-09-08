@@ -20,12 +20,14 @@
 //! <side-effects-end>
 
 use crate::app::AppContext;
+use async_trait::async_trait;
 
 pub mod list_games;
 pub mod dashboard;
 pub mod list_achievements;
 pub mod show_progress;
 
+#[async_trait]
 pub trait Plugin {
     /// Defines the clap command for the plugin.
     ///
@@ -67,7 +69,7 @@ pub trait Plugin {
     /// <side-effects-start>
     /// - Varies by plugin, but can include network requests, file I/O, or printing to the console.
     /// <side-effects-end>
-    fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches);
+    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches);
 }
 
 pub fn get_plugins() -> Vec<Box<dyn Plugin>> {

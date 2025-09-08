@@ -1,3 +1,4 @@
+use crate::constants;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use tokio;
@@ -16,7 +17,7 @@ struct GamesList {
 }
 
 /// Represents a game owned by the user.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Game {
     pub appid: u32,
     pub name: String,
@@ -48,7 +49,7 @@ pub struct PlayerStats {
 }
 
 /// Represents an achievement for a game.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Achievement {
     pub apiname: String,
     pub achieved: u8,
@@ -70,7 +71,7 @@ pub struct GlobalAchievements {
 }
 
 /// Represents a global achievement.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct GlobalAchievement {
     pub name: String,
     pub percent: f32,
@@ -80,18 +81,20 @@ pub struct GlobalAchievement {
 pub struct Api {
     api_key: String,
     steam_id: String,
+    base_url: String,
 }
 
 impl Api {
     /// Creates a new `Api` instance.
     ///
     /// <purpose-start>
-    /// This function initializes a new `Api` instance with the provided API key and Steam ID.
+    /// This function initializes a new `Api` instance with the provided API key, Steam ID, and base URL.
     /// <purpose-end>
     ///
     /// <inputs-start>
     /// - `api_key`: The Steam API key.
     /// - `steam_id`: The user's Steam ID.
+    /// - `base_url`: The base URL for the Steam API.
     /// <inputs-end>
     ///
     /// <outputs-start>
@@ -101,8 +104,12 @@ impl Api {
     /// <side-effects-start>
     /// - None.
     /// <side-effects-end>
-    pub fn new(api_key: String, steam_id: String) -> Api {
-        Api { api_key, steam_id }
+    pub fn new(api_key: String, steam_id: String, base_url: String) -> Api {
+        Api {
+            api_key,
+            steam_id,
+            base_url,
+        }
     }
 
     /// Retrieves the list of games owned by the user.
@@ -123,13 +130,12 @@ impl Api {
     /// <side-effects-start>
     /// - **Network request**: Sends a GET request to the Steam API.
     /// <side-effects-end>
-    #[tokio::main]
     pub async fn get_games_list(&self) -> Result<Vec<Game>, reqwest::Error> {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
         
         // List of owned games
-        let url = format!("http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1");
+        let url = format!("{}/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1", self.base_url);
 
         // Send the GET request
         let response = reqwest::get(url).await?;
@@ -163,13 +169,12 @@ impl Api {
     /// <side-effects-start>
     /// - **Network request**: Sends a GET request to the Steam API.
     /// <side-effects-end>
-    #[tokio::main]
     pub async fn get_game_achievements(&self, appid: u32) -> Result<(String, Vec<Achievement>), reqwest::Error> {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
 
         // Game achievements
-        let url = format!("http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={api_key}&steamid={steam_id}&l=en");
+        let url = format!("{}/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={api_key}&steamid={steam_id}&l=en", self.base_url);
 
         // Send the GET request
         let response = reqwest::get(url).await?;
@@ -203,10 +208,9 @@ impl Api {
     /// <side-effects-start>
     /// - **Network request**: Sends a GET request to the Steam API.
     /// <side-effects-end>
-    #[tokio::main]
     pub async fn get_global_achievements(&self, appid: u32) -> Result<Vec<GlobalAchievement>, reqwest::Error> {
         // Global achievements
-        let url = format!("http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid={appid}&format=json&l=en");
+        let url = format!("{}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid={appid}&format=json&l=en", self.base_url);
 
         // Send the GET request
         let response = reqwest::get(url).await?;
@@ -220,5 +224,165 @@ impl Api {
         }
 
         Ok(Vec::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_new_api() {
+        let api = Api::new(
+            "test_key".to_string(),
+            "test_id".to_string(),
+            constants::STEAM_API_BASE_URL.to_string(),
+        );
+        assert_eq!(api.api_key, "test_key");
+        assert_eq!(api.steam_id, "test_id");
+        assert_eq!(api.base_url, "http://api.steampowered.com");
+    }
+
+    #[tokio::test]
+    async fn test_get_games_list_success() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{
+                "response": {
+                    "game_count": 1,
+                    "games": [
+                        {
+                            "appid": 1,
+                            "name": "Test Game",
+                            "playtime_forever": 100,
+                            "img_icon_url": "",
+                            "playtime_windows_forever": 100,
+                            "playtime_mac_forever": 0,
+                            "playtime_linux_forever": 0,
+                            "rtime_last_played": 0,
+                            "playtime_disconnected": 0
+                        }
+                    ]
+                }
+            }"#)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
+        let games = api.get_games_list().await.unwrap();
+
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].name, "Test Game");
+    }
+
+    #[tokio::test]
+    async fn test_get_games_list_fail() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+            .with_status(500)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
+        let games = api.get_games_list().await.unwrap();
+
+        assert!(games.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_game_achievements_success() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=1&key=test_key&steamid=test_id&l=en")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{
+                "playerstats": {
+                    "steamID": "test_id",
+                    "gameName": "Test Game",
+                    "achievements": [
+                        {
+                            "apiname": "test_ach",
+                            "achieved": 1,
+                            "unlocktime": 0,
+                            "name": "Test Achievement",
+                            "description": "A test achievement"
+                        }
+                    ],
+                    "success": true
+                }
+            }"#)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
+        let (game_name, achievements) = api.get_game_achievements(1).await.unwrap();
+
+        assert_eq!(game_name, "Test Game");
+        assert_eq!(achievements.len(), 1);
+        assert_eq!(achievements[0].name, "Test Achievement");
+    }
+
+    #[tokio::test]
+    async fn test_get_game_achievements_fail() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=1&key=test_key&steamid=test_id&l=en")
+            .with_status(500)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
+        let (game_name, achievements) = api.get_game_achievements(1).await.unwrap();
+
+        assert!(game_name.is_empty());
+        assert!(achievements.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_global_achievements_success() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=1&format=json&l=en")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{
+                "achievementpercentages": {
+                    "achievements": [
+                        {
+                            "name": "test_ach",
+                            "percent": 50.5
+                        }
+                    ]
+                }
+            }"#)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
+        let achievements = api.get_global_achievements(1).await.unwrap();
+
+        assert_eq!(achievements.len(), 1);
+        assert_eq!(achievements[0].name, "test_ach");
+        assert_eq!(achievements[0].percent, 50.5);
+    }
+
+    #[tokio::test]
+    async fn test_get_global_achievements_fail() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=1&format=json&l=en")
+            .with_status(500)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
+        let achievements = api.get_global_achievements(1).await.unwrap();
+
+        assert!(achievements.is_empty());
     }
 }

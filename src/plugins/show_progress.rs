@@ -19,10 +19,12 @@
 //! <side-effects-end>
 
 use crate::{app::AppContext, plugins::Plugin};
+use async_trait::async_trait;
 use clap::{Arg, Command};
 
 pub struct ShowProgressPlugin;
 
+#[async_trait]
 impl Plugin for ShowProgressPlugin {
     /// Defines the clap command for the `progress` plugin.
     ///
@@ -75,17 +77,17 @@ impl Plugin for ShowProgressPlugin {
     /// - Makes a network request to the Steam API to fetch achievement data.
     /// - Prints the progress bar to the console.
     /// <side-effects-end>
-    fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
+    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
         let game_id_str = matches.get_one::<String>("game_id").unwrap();
 
         if let Ok(game_id) = game_id_str.parse::<u32>() {
             let mut achievements = Vec::new();
             let mut game_name = String::new();
 
-            match &app_context.api.get_game_achievements(game_id) {
+            match app_context.api.get_game_achievements(game_id).await {
                 Ok((name, achs)) => {
-                    game_name = name.clone();
-                    achievements = achs.clone();
+                    game_name = name;
+                    achievements = achs;
                 }
                 Err(e) => eprintln!("Error while trying to get achievements: {}", e),
             }

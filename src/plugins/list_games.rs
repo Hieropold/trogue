@@ -19,10 +19,12 @@
 //! <side-effects-end>
 
 use crate::{app::AppContext, plugins::Plugin, ui};
+use async_trait::async_trait;
 use clap::{Arg, Command};
 
 pub struct ListGamesPlugin;
 
+#[async_trait]
 impl Plugin for ListGamesPlugin {
     /// Defines the clap command for the `list` plugin.
     ///
@@ -91,13 +93,13 @@ E.g.: -p "i: n""#,
     /// - Makes a network request to the Steam API to fetch the list of games.
     /// - Prints the list of games to the console.
     /// <side-effects-end>
-    fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
+    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
         let filter = matches.get_one::<String>("filter").cloned();
         let pattern = matches.get_one::<String>("pattern").cloned();
 
         let mut games = Vec::new();
-        match &app_context.api.get_games_list() {
-            Ok(resp) => games = resp.clone(),
+        match app_context.api.get_games_list().await {
+            Ok(resp) => games = resp,
             Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
         }
 

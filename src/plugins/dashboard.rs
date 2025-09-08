@@ -19,10 +19,12 @@
 //! <side-effects-end>
 
 use crate::{app::AppContext, plugins::Plugin};
+use async_trait::async_trait;
 use clap::Command;
 
 pub struct DashboardPlugin;
 
+#[async_trait]
 impl Plugin for DashboardPlugin {
     /// Defines the clap command for the `dashboard` plugin.
     ///
@@ -68,10 +70,10 @@ impl Plugin for DashboardPlugin {
     /// - Makes multiple network requests to the Steam API to fetch game and achievement data.
     /// - Prints the dashboard to the console.
     /// <side-effects-end>
-    fn execute(&self, app_context: &AppContext, _matches: &clap::ArgMatches) {
+    async fn execute(&self, app_context: &AppContext, _matches: &clap::ArgMatches) {
         let mut games = Vec::new();
-        match &app_context.api.get_games_list() {
-            Ok(resp) => games = resp.clone(),
+        match app_context.api.get_games_list().await {
+            Ok(resp) => games = resp,
             Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
         }
 
@@ -95,10 +97,10 @@ impl Plugin for DashboardPlugin {
             let mut achievements = Vec::new();
             let mut game_name = String::new();
 
-            match &app_context.api.get_game_achievements(game.appid) {
+            match app_context.api.get_game_achievements(game.appid).await {
                 Ok((name, achs)) => {
-                    game_name = name.clone();
-                    achievements = achs.clone();
+                    game_name = name;
+                    achievements = achs;
                 }
                 Err(e) => eprintln!("Error while trying to get achievements: {}", e),
             }
