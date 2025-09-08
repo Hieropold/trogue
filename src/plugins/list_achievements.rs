@@ -21,6 +21,7 @@
 use crate::{app::AppContext, plugins::Plugin, ui};
 use async_trait::async_trait;
 use clap::{Arg, Command};
+use std::io::Write;
 
 pub struct ListAchievementsPlugin;
 
@@ -81,6 +82,8 @@ impl Plugin for ListAchievementsPlugin {
     /// - `&self`: A reference to the plugin instance.
     /// - `app_context`: The shared application context.
     /// - `matches`: The clap argument matches for the `achievements` subcommand.
+    /// - `writer`: A mutable reference to a writer for standard output.
+    /// - `err_writer`: A mutable reference to a writer for standard error.
     /// <inputs-end>
     ///
     /// <outputs-start>
@@ -89,9 +92,15 @@ impl Plugin for ListAchievementsPlugin {
     ///
     /// <side-effects-start>
     /// - Makes network requests to the Steam API to fetch achievement data.
-    /// - Prints the list of achievements to the console.
+    /// - Writes the list of achievements to the provided writer.
     /// <side-effects-end>
-    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
+    async fn execute(
+        &self,
+        app_context: &AppContext,
+        matches: &clap::ArgMatches,
+        writer: &mut (dyn Write + Send),
+        err_writer: &mut (dyn Write + Send),
+    ) {
         let game_id_str = matches.get_one::<String>("game_id").unwrap();
         let add_global = matches.get_flag("global");
         let remaining = matches.get_flag("remaining");
@@ -101,7 +110,7 @@ impl Plugin for ListAchievementsPlugin {
 
             match app_context.api.get_game_achievements(game_id).await {
                 Ok((_, achs)) => achievements = achs,
-                Err(e) => eprintln!("Error while trying to get achievements: {}", e),
+                Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
             }
 
             let mut global_achievement_map = std::collections::HashMap::new();
@@ -113,7 +122,7 @@ impl Plugin for ListAchievementsPlugin {
                                 .insert(global_achievement.name.clone(), global_achievement.percent);
                         }
                     }
-                    Err(e) => eprintln!("Error while trying to get global achievements: {}", e),
+                    Err(e) => writeln!(err_writer, "Error while trying to get global achievements: {}", e).unwrap(),
                 }
             }
 
@@ -139,10 +148,10 @@ impl Plugin for ListAchievementsPlugin {
                     title.push_str(&format!(" {}%", global_percent));
                 }
 
-                println!("{}", title);
+                writeln!(writer, "{}", title).unwrap();
             }
         } else {
-            eprintln!("Invalid game id: {}", game_id_str);
+            writeln!(err_writer, "Invalid game id: {}", game_id_str).unwrap();
         }
     }
 }

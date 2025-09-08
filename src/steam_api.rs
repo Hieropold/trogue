@@ -134,21 +134,16 @@ impl Api {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
         
-        // List of owned games
         let url = format!("{}/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1", self.base_url);
 
-        // Send the GET request
         let response = reqwest::get(url).await?;
 
-        // Check if the request was successful and parse the JSON
-        if response.status().is_success() {
-            let data: GamesListResponse = response.json().await?;
-            return Ok(data.response.games);
-        } else {
-            eprintln!("Failed to fetch data: {}", response.status());
+        if !response.status().is_success() {
+            return Err(response.error_for_status().unwrap_err());
         }
 
-        Ok(Vec::new())
+        let data: GamesListResponse = response.json().await?;
+        Ok(data.response.games)
     }
 
     /// Retrieves the achievements for a specific game.
@@ -173,21 +168,16 @@ impl Api {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
 
-        // Game achievements
         let url = format!("{}/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={api_key}&steamid={steam_id}&l=en", self.base_url);
 
-        // Send the GET request
         let response = reqwest::get(url).await?;
 
-        // Check if the request was successful and parse the JSON
-        if response.status().is_success() {
-            let data: PlayerStatsResponse = response.json().await?;
-            return Ok((data.playerstats.game_name, data.playerstats.achievements));
-        } else {
-            eprintln!("Failed to fetch data: {}", response.status());
+        if !response.status().is_success() {
+            return Err(response.error_for_status().unwrap_err());
         }
 
-        Ok((String::new(), Vec::new()))
+        let data: PlayerStatsResponse = response.json().await?;
+        Ok((data.playerstats.game_name, data.playerstats.achievements))
     }
 
     /// Retrieves the global achievement percentages for a specific game.
@@ -209,21 +199,16 @@ impl Api {
     /// - **Network request**: Sends a GET request to the Steam API.
     /// <side-effects-end>
     pub async fn get_global_achievements(&self, appid: u32) -> Result<Vec<GlobalAchievement>, reqwest::Error> {
-        // Global achievements
         let url = format!("{}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid={appid}&format=json&l=en", self.base_url);
 
-        // Send the GET request
         let response = reqwest::get(url).await?;
 
-        // Check if the request was successful and parse the JSON
-        if response.status().is_success() {
-            let data: GlobalAchievementsResponse = response.json().await?;
-            return Ok(data.achievementpercentages.achievements);
-        } else {
-            eprintln!("Failed to fetch data: {}", response.status());
+        if !response.status().is_success() {
+            return Err(response.error_for_status().unwrap_err());
         }
 
-        Ok(Vec::new())
+        let data: GlobalAchievementsResponse = response.json().await?;
+        Ok(data.achievementpercentages.achievements)
     }
 }
 
@@ -288,9 +273,9 @@ mod tests {
             .create_async().await;
 
         let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
-        let games = api.get_games_list().await.unwrap();
+        let result = api.get_games_list().await;
 
-        assert!(games.is_empty());
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -337,10 +322,9 @@ mod tests {
             .create_async().await;
 
         let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
-        let (game_name, achievements) = api.get_game_achievements(1).await.unwrap();
+        let result = api.get_game_achievements(1).await;
 
-        assert!(game_name.is_empty());
-        assert!(achievements.is_empty());
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -381,8 +365,8 @@ mod tests {
             .create_async().await;
 
         let api = Api::new("test_key".to_string(), "test_id".to_string(), url);
-        let achievements = api.get_global_achievements(1).await.unwrap();
+        let result = api.get_global_achievements(1).await;
 
-        assert!(achievements.is_empty());
+        assert!(result.is_err());
     }
 }

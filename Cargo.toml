@@ -15,4 +15,6 @@ clap = { version = "4.0", features = ["derive"] }
 async-trait = "0.1.81"
 
 [dev-dependencies]
+gag = "1.0.0"
+lazy_static = "1.4.0"
 mockito = "1.4.0"

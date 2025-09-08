@@ -7,6 +7,7 @@ pub mod plugins;
 
 use cfg::Cfg;
 use clap::Command;
+use std::io::{stdout, stderr};
 use std::process;
 
 /// Loads the application configuration.
@@ -76,7 +77,12 @@ async fn main() {
 
     for plugin in &plugins {
         if let Some(sub_matches) = matches.subcommand_matches(plugin.command().get_name()) {
-            plugin.execute(&app_context, sub_matches).await;
+            plugin.execute(
+                &app_context,
+                sub_matches,
+                &mut stdout(),
+                &mut stderr(),
+            ).await;
             return;
         }
     }

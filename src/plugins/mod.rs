@@ -21,6 +21,7 @@
 
 use crate::app::AppContext;
 use async_trait::async_trait;
+use std::io::Write;
 
 pub mod list_games;
 pub mod dashboard;
@@ -60,6 +61,8 @@ pub trait Plugin {
     /// - `&self`: A reference to the plugin instance.
     /// - `app_context`: The shared application context.
     /// - `matches`: The clap argument matches for the subcommand.
+    /// - `writer`: A mutable reference to a writer for standard output.
+    /// - `err_writer`: A mutable reference to a writer for standard error.
     /// <inputs-end>
     ///
     /// <outputs-start>
@@ -67,9 +70,15 @@ pub trait Plugin {
     /// <outputs-end>
     ///
     /// <side-effects-start>
-    /// - Varies by plugin, but can include network requests, file I/O, or printing to the console.
+    /// - Varies by plugin, but can include network requests, file I/O, or writing to the provided writers.
     /// <side-effects-end>
-    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches);
+    async fn execute(
+        &self,
+        app_context: &AppContext,
+        matches: &clap::ArgMatches,
+        writer: &mut (dyn Write + Send),
+        err_writer: &mut (dyn Write + Send),
+    );
 }
 
 pub fn get_plugins() -> Vec<Box<dyn Plugin>> {

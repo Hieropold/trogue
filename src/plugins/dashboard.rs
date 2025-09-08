@@ -21,6 +21,7 @@
 use crate::{app::AppContext, plugins::Plugin};
 use async_trait::async_trait;
 use clap::Command;
+use std::io::Write;
 
 pub struct DashboardPlugin;
 
@@ -60,6 +61,8 @@ impl Plugin for DashboardPlugin {
     /// - `&self`: A reference to the plugin instance.
     /// - `app_context`: The shared application context.
     /// - `_matches`: The clap argument matches for the `dashboard` subcommand (unused).
+    /// - `writer`: A mutable reference to a writer for standard output.
+    /// - `err_writer`: A mutable reference to a writer for standard error.
     /// <inputs-end>
     ///
     /// <outputs-start>
@@ -68,13 +71,19 @@ impl Plugin for DashboardPlugin {
     ///
     /// <side-effects-start>
     /// - Makes multiple network requests to the Steam API to fetch game and achievement data.
-    /// - Prints the dashboard to the console.
+    /// - Writes the dashboard to the provided writer.
     /// <side-effects-end>
-    async fn execute(&self, app_context: &AppContext, _matches: &clap::ArgMatches) {
+    async fn execute(
+        &self,
+        app_context: &AppContext,
+        _matches: &clap::ArgMatches,
+        writer: &mut (dyn Write + Send),
+        err_writer: &mut (dyn Write + Send),
+    ) {
         let mut games = Vec::new();
         match app_context.api.get_games_list().await {
             Ok(resp) => games = resp,
-            Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
+            Err(e) => writeln!(err_writer, "Error while trying to get Steam data: {}", e).unwrap(),
         }
 
         // Sort games by last played time (most recent first)
@@ -89,9 +98,9 @@ impl Plugin for DashboardPlugin {
         let title = "Recently Played Games Dashboard";
         let padding = (box_width - title.len()) / 2;
 
-        println!("{}", "=".repeat(box_width));
-        println!("{}{}{}", " ".repeat(padding), title, " ".repeat(padding));
-        println!("{}", "=".repeat(box_width));
+        writeln!(writer, "{}", "=".repeat(box_width)).unwrap();
+        writeln!(writer, "{}{}{}", " ".repeat(padding), title, " ".repeat(padding)).unwrap();
+        writeln!(writer, "{}", "=".repeat(box_width)).unwrap();
 
         for game in recent_games {
             let mut achievements = Vec::new();
@@ -102,13 +111,13 @@ impl Plugin for DashboardPlugin {
                     game_name = name;
                     achievements = achs;
                 }
-                Err(e) => eprintln!("Error while trying to get achievements: {}", e),
+                Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
             }
 
-            println!("{}", game_name);
+            writeln!(writer, "{}", game_name).unwrap();
 
             if achievements.is_empty() {
-                println!("No achievements found for this game");
+                writeln!(writer, "No achievements found for this game").unwrap();
                 continue;
             }
 
@@ -121,14 +130,14 @@ impl Plugin for DashboardPlugin {
             let filled_chars = ((percentage / 100.0) * bar_width as f32).round() as usize;
             let empty_chars = bar_width - filled_chars;
 
-            print!("[");
+            write!(writer, "[").unwrap();
             for _ in 0..filled_chars {
-                print!("█");
+                write!(writer, "█").unwrap();
             }
             for _ in 0..empty_chars {
-                print!(" ");
+                write!(writer, " ").unwrap();
             }
-            println!("] {:.1}% ({}/{})", percentage, completed, total);
+            writeln!(writer, "] {:.1}% ({}/{})", percentage, completed, total).unwrap();
         }
     }
 }

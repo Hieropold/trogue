@@ -21,6 +21,7 @@
 use crate::{app::AppContext, plugins::Plugin, ui};
 use async_trait::async_trait;
 use clap::{Arg, Command};
+use std::io::Write;
 
 pub struct ListGamesPlugin;
 
@@ -83,6 +84,8 @@ E.g.: -p "i: n""#,
     /// - `&self`: A reference to the plugin instance.
     /// - `app_context`: The shared application context.
     /// - `matches`: The clap argument matches for the `list` subcommand.
+    /// - `writer`: A mutable reference to a writer for standard output.
+    /// - `err_writer`: A mutable reference to a writer for standard error.
     /// <inputs-end>
     ///
     /// <outputs-start>
@@ -91,25 +94,31 @@ E.g.: -p "i: n""#,
     ///
     /// <side-effects-start>
     /// - Makes a network request to the Steam API to fetch the list of games.
-    /// - Prints the list of games to the console.
+    /// - Writes the list of games to the provided writer.
     /// <side-effects-end>
-    async fn execute(&self, app_context: &AppContext, matches: &clap::ArgMatches) {
+    async fn execute(
+        &self,
+        app_context: &AppContext,
+        matches: &clap::ArgMatches,
+        writer: &mut (dyn Write + Send),
+        err_writer: &mut (dyn Write + Send),
+    ) {
         let filter = matches.get_one::<String>("filter").cloned();
         let pattern = matches.get_one::<String>("pattern").cloned();
 
         let mut games = Vec::new();
         match app_context.api.get_games_list().await {
             Ok(resp) => games = resp,
-            Err(e) => eprintln!("Error while trying to get Steam data: {}", e),
+            Err(e) => writeln!(err_writer, "Error while trying to get Steam data: {}", e).unwrap(),
         }
 
         match filter {
             Some(f) => {
-                println!("Displaying games filtered by: {}", f);
+                writeln!(writer, "Displaying games filtered by: {}", f).unwrap();
                 games.retain(|entry| entry.name.to_lowercase().contains(&f.to_lowercase()));
             }
             None => {
-                println!("Displaying all games:");
+                writeln!(writer, "Displaying all games:").unwrap();
             }
         }
 
@@ -118,7 +127,7 @@ E.g.: -p "i: n""#,
         for game in games {
             let displayable_game = ui::DisplayableGame { game };
             let formatted_game = displayable_game.format(&pattern);
-            println!("{}", formatted_game);
+            writeln!(writer, "{}", formatted_game).unwrap();
         }
     }
 }
