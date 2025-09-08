@@ -41,6 +41,19 @@ To run linting:
 cargo clippy
 ```
 
+# Test
+
+Run the tests:
+```
+cargo test
+cargo test -- --nocapture
+```
+
+Run the tests with coverage.
+```
+cargo tarpaulin --out Html -- --test-threads=1
+```
+
 # Development
 
 ## Steam

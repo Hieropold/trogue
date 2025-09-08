@@ -258,3 +258,94 @@ impl DisplayableAchievement {
         datetime.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_mock_game() -> Game {
+        Game {
+            appid: 123,
+            name: "Test Game".to_string(),
+            playtime_forever: 100,
+            img_icon_url: "icon_url".to_string(),
+            playtime_windows_forever: 100,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played: 0,
+            playtime_disconnected: 0,
+        }
+    }
+
+    fn create_mock_achievement(achieved: u8, unlocktime: u64) -> Achievement {
+        Achievement {
+            apiname: "test_api".to_string(),
+            name: "Test Achievement".to_string(),
+            description: "Test Description".to_string(),
+            achieved,
+            unlocktime,
+        }
+    }
+
+    #[test]
+    fn test_displayable_game_format() {
+        let game = create_mock_game();
+        let displayable_game = DisplayableGame { game };
+
+        let formatted = displayable_game.format("n (i)");
+        assert_eq!(formatted, "Test Game (123)");
+    }
+
+    #[test]
+    fn test_displayable_achievement_format_achieved() {
+        let achievement = create_mock_achievement(1, 1672531200); // 2023-01-01 00:00:00
+        let displayable_achievement = DisplayableAchievement { achievement };
+
+        let formatted = displayable_achievement.format("i: n - s, t, d");
+        assert_eq!(
+            formatted,
+            "test_api: Test Achievement - Y, 2023-01-01 00:00:00, Test Description"
+        );
+    }
+
+    #[test]
+    fn test_displayable_achievement_format_not_achieved() {
+        let achievement = create_mock_achievement(0, 0);
+        let displayable_achievement = DisplayableAchievement { achievement };
+
+        let formatted = displayable_achievement.format("i: n - s, t, d");
+        assert_eq!(
+            formatted,
+            "test_api: Test Achievement - N, 1970-01-01 00:00:00, Test Description"
+        );
+    }
+
+    #[test]
+    fn test_formatted_unlocktime() {
+        let achievement = create_mock_achievement(1, 1672531200); // 2023-01-01 00:00:00
+        let displayable_achievement = DisplayableAchievement { achievement };
+
+        let formatted_time = displayable_achievement.formatted_unlocktime();
+        assert_eq!(formatted_time, "2023-01-01 00:00:00");
+    }
+
+    #[test]
+    fn test_render_card_achieved() {
+        let achievement = create_mock_achievement(1, 1672531200); // 2023-01-01 00:00:00
+        let displayable_achievement = DisplayableAchievement { achievement };
+
+        let card = displayable_achievement.render_card();
+        let expected_card = "┌───────────────────────────┐\n│ Name:            test_api │\n│ Achieved:               Y │\n│ Date: 2023-01-01 00:00:00 │\n└───────────────────────────┘\n";
+        assert_eq!(card, expected_card);
+    }
+
+    #[test]
+    fn test_render_card_not_achieved() {
+        let achievement = create_mock_achievement(0, 0);
+        let displayable_achievement = DisplayableAchievement { achievement };
+
+        let card = displayable_achievement.render_card();
+        let expected_card = "┌───────────────────────────┐\n│ Name:            test_api │\n│ Achieved:               N │\n│ Date: 1970-01-01 00:00:00 │\n└───────────────────────────┘\n";
+        assert_eq!(card, expected_card);
+    }
+}

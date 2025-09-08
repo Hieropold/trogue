@@ -4,3 +4,6 @@ trophyroom
 
 # Ignore sensitive environment var values
 .env
+
+/tarpaulin-report.html
+/tarpaulin-report.xml
