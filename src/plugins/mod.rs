@@ -89,3 +89,47 @@ pub fn get_plugins() -> Vec<Box<dyn Plugin>> {
         Box::new(show_progress::ShowProgressPlugin),
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests the `get_plugins` function.
+    ///
+    /// <purpose-start>
+    /// This test verifies that the `get_plugins` function correctly registers and returns all available plugins.
+    /// It ensures that the plugin discovery mechanism is working as expected and that all core features are included.
+    /// <purpose-end>
+    ///
+    /// <inputs-start>
+    /// - None
+    /// <inputs-end>
+    ///
+    /// <outputs-start>
+    /// - None
+    /// <outputs-end>
+    ///
+    /// <side-effects-start>
+    /// - None
+    /// <side-effects-end>
+    #[test]
+    fn test_get_plugins() {
+        let plugins = get_plugins();
+        
+        // Expected number of plugins.
+        assert_eq!(plugins.len(), 4);
+
+        let mut expected_names = vec![
+            "list",
+            "dashboard",
+            "achievements",
+            "progress",
+        ];
+        expected_names.sort();
+
+        let mut actual_names: Vec<String> = plugins.iter().map(|p| p.command().get_name().to_string()).collect();
+        actual_names.sort();
+
+        assert_eq!(actual_names, expected_names);
+    }
+}
