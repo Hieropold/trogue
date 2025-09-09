@@ -155,3 +155,242 @@ impl Plugin for ListAchievementsPlugin {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::AppContext;
+    use crate::steam_api::{Api, Achievement, GlobalAchievement};
+    use clap::ArgMatches;
+
+    fn create_mock_achievement(apiname: &str, name: &str, achieved: u8) -> Achievement {
+        Achievement {
+            apiname: apiname.to_string(),
+            name: name.to_string(),
+            description: "Test Description".to_string(),
+            achieved,
+            unlocktime: 0,
+        }
+    }
+
+    fn create_mock_global_achievement(name: &str, percent: f32) -> GlobalAchievement {
+        GlobalAchievement {
+            name: name.to_string(),
+            percent,
+        }
+    }
+
+    async fn setup_test_env_game_achievements(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
+        let mut server = mockito::Server::new_async().await;
+        server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=123&key=test_key&steamid=test_id&l=en")
+            .with_status(status_code as usize)
+            .with_header("content-type", "application/json")
+            .with_body(mock_body)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
+        let app_context = AppContext { api };
+        (app_context, server)
+    }
+
+    async fn setup_test_env_with_global(
+        game_ach_body: &str, game_ach_status: u16,
+        global_ach_body: &str, global_ach_status: u16
+    ) -> (AppContext, mockito::ServerGuard) {
+        let mut server = mockito::Server::new_async().await;
+
+        server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=123&key=test_key&steamid=test_id&l=en")
+            .with_status(game_ach_status as usize)
+            .with_header("content-type", "application/json")
+            .with_body(game_ach_body)
+            .create_async().await;
+
+        server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=123&format=json&l=en")
+            .with_status(global_ach_status as usize)
+            .with_header("content-type", "application/json")
+            .with_body(global_ach_body)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
+        let app_context = AppContext { api };
+        (app_context, server)
+    }
+
+    fn get_matches_for_args(args: &[&str]) -> ArgMatches {
+        ListAchievementsPlugin.command().get_matches_from(args)
+    }
+
+    #[test]
+    fn test_command() {
+        let plugin = ListAchievementsPlugin;
+        let cmd = plugin.command();
+        assert_eq!(cmd.get_name(), "achievements");
+        assert!(cmd.get_about().is_some());
+        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "game_id"));
+        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "global"));
+        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "remaining"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_success() {
+        let achievements = vec![
+            create_mock_achievement("ach1", "First Achievement", 1),
+            create_mock_achievement("ach2", "Second Achievement", 0),
+        ];
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Test Game",
+                "achievements": achievements,
+                "success": true
+            }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env_game_achievements(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["achievements", "123"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("First Achievement"));
+        assert!(output.contains("Second Achievement"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_invalid_game_id() {
+        let (app_context, _server) = setup_test_env_game_achievements("", 200).await;
+        let matches = get_matches_for_args(&["achievements", "invalid"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(err_writer).unwrap();
+        assert_eq!(output.trim(), "Invalid game id: invalid");
+    }
+
+    #[tokio::test]
+    async fn test_execute_get_achievements_api_error() {
+        let (app_context, _server) = setup_test_env_game_achievements("", 500).await;
+        let matches = get_matches_for_args(&["achievements", "123"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(err_writer).unwrap();
+        assert!(output.contains("Error while trying to get achievements"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_no_achievements() {
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Test Game",
+                "achievements": [],
+                "success": true
+            }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env_game_achievements(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["achievements", "123"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert_eq!(output.trim(), "");
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_remaining_filter() {
+        let achievements = vec![
+            create_mock_achievement("ach1", "First Achievement", 1),
+            create_mock_achievement("ach2", "Second Achievement", 0),
+        ];
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Test Game",
+                "achievements": achievements,
+                "success": true
+            }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env_game_achievements(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["achievements", "123", "--remaining"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(!output.contains("First Achievement"));
+        assert!(output.contains("Second Achievement"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_global_stats() {
+        let game_achievements = vec![
+            create_mock_achievement("ach1", "First Achievement", 1),
+            create_mock_achievement("ach2", "Second Achievement", 0),
+        ];
+        let game_ach_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Test Game",
+                "achievements": game_achievements,
+                "success": true
+            }
+        })).unwrap();
+
+        let global_achievements = vec![
+            create_mock_global_achievement("ach1", 50.5),
+            create_mock_global_achievement("ach2", 10.2),
+        ];
+        let global_ach_body = serde_json::to_string(&serde_json::json!({
+            "achievementpercentages": { "achievements": global_achievements }
+        })).unwrap();
+
+        let (app_context, _server) = setup_test_env_with_global(&game_ach_body, 200, &global_ach_body, 200).await;
+        let matches = get_matches_for_args(&["achievements", "123", "--global"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("First Achievement"));
+        assert!(output.contains("50.5%"));
+        assert!(output.contains("Second Achievement"));
+        assert!(output.contains("10.2%"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_global_stats_api_error() {
+        let game_achievements = vec![create_mock_achievement("ach1", "First Achievement", 1)];
+        let game_ach_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Test Game",
+                "achievements": game_achievements,
+                "success": true
+            }
+        })).unwrap();
+
+        let (app_context, _server) = setup_test_env_with_global(&game_ach_body, 200, "", 500).await;
+        let matches = get_matches_for_args(&["achievements", "123", "--global"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let err_output = String::from_utf8(err_writer).unwrap();
+        assert!(err_output.contains("Error while trying to get global achievements"));
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("First Achievement"));
+    }
+}
