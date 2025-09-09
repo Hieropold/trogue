@@ -131,3 +131,138 @@ E.g.: -p "i: n""#,
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::AppContext;
+    use crate::steam_api::{Api, Game};
+    use clap::ArgMatches;
+
+    fn create_mock_game(appid: u32, name: &str) -> Game {
+        Game {
+            appid,
+            name: name.to_string(),
+            playtime_forever: 0,
+            img_icon_url: "".to_string(),
+            playtime_windows_forever: 0,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played: 0,
+            playtime_disconnected: 0,
+        }
+    }
+
+    async fn setup_test_env(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
+        let mut server = mockito::Server::new_async().await;
+        server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+            .with_status(status_code as usize)
+            .with_header("content-type", "application/json")
+            .with_body(mock_body)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
+        let app_context = AppContext { api };
+        (app_context, server)
+    }
+
+    fn get_matches_for_args(args: &[&str]) -> ArgMatches {
+        ListGamesPlugin.command().get_matches_from(args)
+    }
+
+    #[test]
+    fn test_command() {
+        let plugin = ListGamesPlugin;
+        let cmd = plugin.command();
+        assert_eq!(cmd.get_name(), "list");
+        assert!(cmd.get_about().is_some());
+        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "filter"));
+        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "pattern"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_success_no_filter() {
+        let games = vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")];
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 2, "games": games }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["list"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Displaying all games:"));
+        assert!(output.contains("[1] Game 1"));
+        assert!(output.contains("[2] Game 2"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_success_with_filter() {
+        let games = vec![create_mock_game(1, "Awesome Game"), create_mock_game(2, "Another Game")];
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 2, "games": games }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["list", "--filter", "Awesome"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Displaying games filtered by: Awesome"));
+        assert!(output.contains("[1] Awesome Game"));
+        assert!(!output.contains("[2] Another Game"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_success_with_filter_and_pattern() {
+        let games = vec![create_mock_game(1, "Awesome Game")];
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 1, "games": games }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["list", "--filter", "Awesome", "--pattern", "i - n"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Displaying games filtered by: Awesome"));
+        assert!(output.contains("1 - Awesome Game"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_api_error() {
+        let (app_context, _server) = setup_test_env("", 500).await;
+        let matches = get_matches_for_args(&["list"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(err_writer).unwrap();
+        assert!(output.contains("Error while trying to get Steam data"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_no_games() {
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 0, "games": [] }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["list"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Displaying all games:"));
+        assert!(!output.contains("[")); // No games should be listed
+    }
+}
