@@ -64,7 +64,7 @@ async fn main() {
     let app_context = app::AppContext::new(cfg);
     let plugins = plugins::get_plugins();
 
-    let mut command = Command::new("trophyroom")
+    let mut command = Command::new("trogue")
         .version("1.0")
         .author("Hieropold <unsolicited.pcholler@gmail.com>")
         .about("A CLI tool for displaying Steam achievements");

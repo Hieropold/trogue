@@ -1,21 +1,23 @@
-# Trophyroom
+# TROphy cataloGUE
+
+
 
 Command line tool to view the Steam achievements.
 
 # Configure
 
 Configuration is done through environment:
-* `TROPHYROOM_STEAM_API_KEY`
-* `TROPHYROOM_STEAM_ID`
+* `TROGUE_STEAM_API_KEY`
+* `TROGUE_STEAM_ID`
 
 # Usage
 
 Some possible usage examples:
-* `trophyroom -l` will list all games in the library, outputting game names only
-* `trophyroom -l redemption -p 'i - n'` will list games containing "redemption" in the name, and output game id and game name separated by hyphen
-* `trophyroom -a 48700` will display achievements for a specific game
+* `trogue -l` will list all games in the library, outputting game names only
+* `trogue -l redemption -p 'i - n'` will list games containing "redemption" in the name, and output game id and game name separated by hyphen
+* `trogue -a 48700` will display achievements for a specific game
 
-Run `trophyroom -h` for a full list of available options.
+Run `trogue -h` for a full list of available options.
 
 # Build
 
@@ -73,10 +75,3 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 - [ ] Game name tab completion in CLI mode
 - [ ] Add support for PSN
 - [ ] Add support for Xbox
-
-# Alternative names
-* trphlib - trophylib
-* atk - achievement toolkit
-* atlkt - achievement toolkit
-* gmslb - games library
-* gamelib - games library

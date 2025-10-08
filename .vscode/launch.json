@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'trophyroom'",
+            "name": "Debug executable 'trogue'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=trophyroom",
-                    "--package=trophyroom"
+                    "--bin=trogue",
+                    "--package=trogue"
                 ],
                 "filter": {
-                    "name": "trophyroom",
+                    "name": "trogue",
                     "kind": "bin"
                 }
             },
@@ -26,16 +26,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'trophyroom'",
+            "name": "Debug unit tests in executable 'trogue'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=trophyroom",
-                    "--package=trophyroom"
+                    "--bin=trogue",
+                    "--package=trogue"
                 ],
                 "filter": {
-                    "name": "trophyroom",
+                    "name": "trogue",
                     "kind": "bin"
                 }
             },

@@ -2,7 +2,7 @@
 
 ## Application Purpose
 
-The `trophyroom` application is a command-line interface (CLI) tool designed to interact with the Steam API. It allows users to retrieve information about their owned games and achievement status.
+The `trogue` application is a command-line interface (CLI) tool designed to interact with the Steam API. It allows users to retrieve information about their owned games and achievement status.
 
 ## Features
 

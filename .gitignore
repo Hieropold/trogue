@@ -1,6 +1,6 @@
 # Generated files
 /target/
-trophyroom
+trogue
 
 # Ignore sensitive environment var values
 .env

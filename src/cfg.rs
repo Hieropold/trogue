@@ -93,17 +93,17 @@ impl Cfg {
     /// <outputs-end>
     ///
     /// <side-effects-start>
-    /// - **Reads environment variables**: Reads the `TROPHYROOM_STEAM_API_KEY` and `TROPHYROOM_STEAM_ID` environment variables.
+    /// - **Reads environment variables**: Reads the `TROGUE_STEAM_API_KEY` and `TROGUE_STEAM_ID` environment variables.
     /// <side-effects-end>
     pub fn load(&mut self) -> Result<(), &str> {
-        match Cfg::read_env("TROPHYROOM_STEAM_API_KEY") {
+        match Cfg::read_env("TROGUE_STEAM_API_KEY") {
             Ok(api_key) => self.api_key = api_key,
-            Err(_) => return Err("Missing TROPHYROOM_STEAM_API_KEY environment variable."),
+            Err(_) => return Err("Missing TROGUE_STEAM_API_KEY environment variable."),
         }
 
-        match Cfg::read_env("TROPHYROOM_STEAM_ID") {
+        match Cfg::read_env("TROGUE_STEAM_ID") {
             Ok(steam_id) => self.steam_id = steam_id,
-            Err(_) => return Err("Missing TROPHYROOM_STEAM_ID environment variable."),
+            Err(_) => return Err("Missing TROGUE_STEAM_ID environment variable."),
         }
 
         Ok(())
