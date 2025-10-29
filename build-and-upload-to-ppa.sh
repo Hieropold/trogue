@@ -20,7 +20,3 @@ debsign -k 995BE09B4F8CC7B8236CE3B35DBE9408AE12691B ../trogue_${VERSION}-1_sourc
 
 # Upload to Launchpad PPA
 dput ppa:hieropold/ppa ../trogue_${VERSION}-1_source.changes
-
-echo "Script created successfully."
-echo "Please edit the script to add your GPG key ID, Launchpad ID, and PPA name."
-echo "Then you can run it to build and upload the package."
