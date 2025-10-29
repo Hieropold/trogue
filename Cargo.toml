@@ -2,6 +2,9 @@
 name = "trogue"
 version = "0.1.0"
 edition = "2021"
+description = "A terminal-based client for viewing Steam achievements."
+authors = ["Hieropold <hieropold@gmail.com>"]
+license = "Apache"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json"] }
@@ -18,3 +21,8 @@ async-trait = "0.1.81"
 gag = "1.0.0"
 lazy_static = "1.4.0"
 mockito = "1.4.0"
+
+[package.metadata.deb]
+copyright = "2025 Hieropold"
+license-file = "LICENSE"
+depends = "libssl-dev"

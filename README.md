@@ -1,6 +1,26 @@
+```
+  /###           /                                                  
+ /  ############/                                                   
+/     #########                                                     
+#     /  #                                                          
+ ##  /  ##                                                          
+    /  ###     ###  /###     /###     /###    ##   ####      /##    
+   ##   ##      ###/ #### / / ###  / /  ###  / ##    ###  / / ###   
+   ##   ##       ##   ###/ /   ###/ /    ###/  ##     ###/ /   ###  
+   ##   ##       ##       ##    ## ##     ##   ##      ## ##    ### 
+   ##   ##       ##       ##    ## ##     ##   ##      ## ########  
+    ##  ##       ##       ##    ## ##     ##   ##      ## #######   
+     ## #      / ##       ##    ## ##     ##   ##      ## ##        
+      ###     /  ##       ##    ## ##     ##   ##      /# ####    / 
+       ######/   ###       ######   ########    ######/ ## ######/  
+         ###      ###       ####      ### ###    #####   ## #####   
+                                           ###                      
+                                     ####   ###                     
+                                   /######  /#                      
+                                  /     ###/                
+```
+
 # TROphy cataloGUE
-
-
 
 Command line tool to view the Steam achievements.
 
@@ -75,3 +95,11 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 - [ ] Game name tab completion in CLI mode
 - [ ] Add support for PSN
 - [ ] Add support for Xbox
+
+# Packaging
+
+To create a Debian package and upload it to a Launchpad PPA:
+
+```bash
+./build-and-upload-to-ppa.sh
+```

@@ -1,0 +1,12 @@
+Source: trogue
+Section: misc
+Priority: optional
+Maintainer: Hieropold <hieropold@gmail.com>
+Build-Depends: debhelper (>= 10), cargo, libssl-dev
+Standards-Version: 4.5.0
+Homepage: https://github.com/hieropold/trogue
+
+Package: trogue
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libssl-dev
+Description: A terminal-based client for viewing Steam achievements.

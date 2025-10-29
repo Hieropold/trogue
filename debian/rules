@@ -1,0 +1,6 @@
+#!/usr/bin/make -f
+
+export DH_CARGO_VENDORED_SOURCES=1
+
+%:
+	dh $@ --with cargo
