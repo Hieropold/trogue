@@ -3,6 +3,10 @@
 # Exit on error
 set -e
 
+# Set maintainer information for dch
+export DEBFULLNAME="Hieropold"
+export DEBEMAIL="hieropold@gmail.com"
+
 # Clean the project
 cargo clean
 
