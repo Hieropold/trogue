@@ -8,4 +8,8 @@ trogue
 /tarpaulin-report.html
 /tarpaulin-report.xml
 
+# Quilt patch management
+.pc/
+
+# Vendored dependencies
 /vendor/

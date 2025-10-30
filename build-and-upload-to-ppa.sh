@@ -9,6 +9,8 @@ cargo clean
 # Create the upstream tarball
 VERSION=$(grep "^version" Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
+echo "Packaging version $VERSION"
+
 # Create the upstream tarball
 tar --exclude='./.git' --exclude='./debian' -czf ../trogue_${VERSION}.orig.tar.gz .
 
