@@ -6,7 +6,7 @@ set -e
 # Clean the project
 cargo clean
 
-# Create the upstream tarball
+# Get version from Cargo.toml
 VERSION=$(grep "^version" Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
 echo "Packaging version $VERSION"
@@ -14,8 +14,12 @@ echo "Packaging version $VERSION"
 # Create the upstream tarball
 tar --exclude='./.git' --exclude='./debian' -czf ../trogue_${VERSION}.orig.tar.gz .
 
+# Update debian/changelog to match the version
+dch -v ${VERSION}-1 "New upstream release ${VERSION}" || true
+dch -r "" || true
+
 # Build the source package
-debuild -S
+debuild -S -sa
 
 # Sign the source package with hieropold's GPG key
 debsign -k 995BE09B4F8CC7B8236CE3B35DBE9408AE12691B ../trogue_${VERSION}-1_source.changes

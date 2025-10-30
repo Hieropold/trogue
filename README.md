@@ -24,6 +24,13 @@
 
 Command line tool to view the Steam achievements.
 
+# Install
+```
+sudo add-apt-repository ppa:hieropold/ppa
+sudo apt update
+sudo apt install trogue
+```
+
 # Configure
 
 Configuration is done through environment:
