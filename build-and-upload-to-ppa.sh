@@ -22,11 +22,8 @@ tar --exclude='./.git' --exclude='./debian' -czf ../trogue_${VERSION}.orig.tar.g
 dch -v ${VERSION}-1 "New upstream release ${VERSION}" || true
 dch -r "" || true
 
-# Build the source package
-debuild -S -sa
-
-# Sign the source package with hieropold's GPG key
-debsign -k 995BE09B4F8CC7B8236CE3B35DBE9408AE12691B ../trogue_${VERSION}-1_source.changes
+# Build and sign the source package with hieropold's GPG key
+debuild -S -sa -k995BE09B4F8CC7B8236CE3B35DBE9408AE12691B
 
 # Upload to Launchpad PPA
 dput ppa:hieropold/ppa ../trogue_${VERSION}-1_source.changes
