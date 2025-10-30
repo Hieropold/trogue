@@ -6,7 +6,8 @@ Build-Depends: debhelper-compat (= 13),
                dh-cargo,
                cargo,
                rustc,
-               libssl-dev
+               libssl-dev,
+               pkg-config
 Standards-Version: 4.6.0
 Homepage: https://github.com/hieropold/trogue
 

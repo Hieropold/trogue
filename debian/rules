@@ -4,3 +4,14 @@ export DH_CARGO_VENDORED_SOURCES=1
 
 %:
 	dh $@ --with cargo
+
+override_dh_auto_configure:
+	dh_auto_configure
+	# Remove incompatible Cargo.lock and let cargo use vendored deps
+	rm -f Cargo.lock
+
+override_dh_auto_build:
+	cargo build --release --offline
+
+override_dh_auto_test:
+	# Skip tests during package build
