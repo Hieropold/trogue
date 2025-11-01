@@ -44,33 +44,33 @@ This structured approach is more robust than informal instructions, enabling the
 
 Example of the comment for Rust:
 ```rust
-    /// Draws the content of a plain text file to the terminal.
-    ///
-    /// <purpose-start>
-    /// This function is responsible for rendering the text content within the
-    /// specified area of the terminal. It also handles the display of the cursor
-    /// when in Edit mode, which is crucial for providing visual feedback to the
-    /// user about their current position in the text.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `frame`: The `Frame` to draw on.
-    /// - `area`: The `Rect` in which to draw the content.
-    /// - `content`: The string slice of the content to be rendered.
-    /// - `mode`: The current `Mode` of the application, which determines whether
-    ///   to display the cursor.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - `Ok(())` if the drawing was successful.
-    /// - `Err(anyhow::Error)` if an error occurs during drawing.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - **Draws to the terminal**: The content is rendered to the screen.
-    /// - **Sets the cursor position**: If in Edit mode, the cursor is positioned
-    ///   at the appropriate location.
-    /// <side-effects-end>
+    // Draws the content of a plain text file to the terminal.
+    //
+    // <purpose-start>
+    // This function is responsible for rendering the text content within the
+    // specified area of the terminal. It also handles the display of the cursor
+    // when in Edit mode, which is crucial for providing visual feedback to the
+    // user about their current position in the text.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `frame`: The `Frame` to draw on.
+    // - `area`: The `Rect` in which to draw the content.
+    // - `content`: The string slice of the content to be rendered.
+    // - `mode`: The current `Mode` of the application, which determines whether
+    //   to display the cursor.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - `Ok(())` if the drawing was successful.
+    // - `Err(anyhow::Error)` if an error occurs during drawing.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - **Draws to the terminal**: The content is rendered to the screen.
+    // - **Sets the cursor position**: If in Edit mode, the cursor is positioned
+    //   at the appropriate location.
+    // <side-effects-end>
 ```
 
 ## Additional Constraints

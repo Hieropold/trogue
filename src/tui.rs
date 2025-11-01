@@ -1,26 +1,26 @@
-/// Allows the user to select a game from a list.
-///
-/// <purpose-start>
-/// This function provides a text-based user interface for selecting a game from a list.
-/// It allows the user to filter the list by typing a search query.
-/// <purpose-end>
-///
-/// <inputs-start>
-/// - `games`: A vector of `steam_api::Game` structs to select from.
-/// <inputs-end>
-///
-/// <outputs-start>
-/// - None.
-/// <outputs-end>
-///
-/// <side-effects-start>
-/// - **Enters raw mode**: The terminal is put into raw mode to handle key events.
-/// - **Clears the screen**: The terminal screen is cleared.
-/// - **Prints to the console**: The list of games is printed to the console.
-/// <side-effects-end>
-///
-/// # Note
-/// This function is currently not used in the application.
+// Allows the user to select a game from a list.
+//
+// <purpose-start>
+// This function provides a text-based user interface for selecting a game from a list.
+// It allows the user to filter the list by typing a search query.
+// <purpose-end>
+//
+// <inputs-start>
+// - `games`: A vector of `steam_api::Game` structs to select from.
+// <inputs-end>
+//
+// <outputs-start>
+// - None.
+// <outputs-end>
+//
+// <side-effects-start>
+// - **Enters raw mode**: The terminal is put into raw mode to handle key events.
+// - **Clears the screen**: The terminal screen is cleared.
+// - **Prints to the console**: The list of games is printed to the console.
+// <side-effects-end>
+//
+// # Note
+// This function is currently not used in the application.
 fn select_game(games: &Vec<steam_api::Game>) {
     // let mut idx = 0;
     // for game in games {

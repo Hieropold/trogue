@@ -27,24 +27,24 @@ pub struct ListGamesPlugin;
 
 #[async_trait]
 impl Plugin for ListGamesPlugin {
-    /// Defines the clap command for the `list` plugin.
-    ///
-    /// <purpose-start>
-    /// This method provides the command-line interface for the `list` plugin,
-    /// which allows users to list their games with optional filtering and formatting.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `&self`: A reference to the plugin instance.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - `clap::Command`: The clap command definition for the `list` plugin.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - None.
-    /// <side-effects-end>
+    // Defines the clap command for the `list` plugin.
+    //
+    // <purpose-start>
+    // This method provides the command-line interface for the `list` plugin,
+    // which allows users to list their games with optional filtering and formatting.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `&self`: A reference to the plugin instance.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - `clap::Command`: The clap command definition for the `list` plugin.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - None.
+    // <side-effects-end>
     fn command(&self) -> Command {
         Command::new("list")
             .about("Displays a list of all games on account set in environment variables")
@@ -73,29 +73,29 @@ E.g.: -p "i: n""#,
             )
     }
 
-    /// Executes the `list` plugin's logic.
-    ///
-    /// <purpose-start>
-    /// This method is called by the core application when the `list` command is invoked.
-    /// It fetches the list of games, applies any specified filters, and prints the formatted list to the console.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `&self`: A reference to the plugin instance.
-    /// - `app_context`: The shared application context.
-    /// - `matches`: The clap argument matches for the `list` subcommand.
-    /// - `writer`: A mutable reference to a writer for standard output.
-    /// - `err_writer`: A mutable reference to a writer for standard error.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - None.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - Makes a network request to the Steam API to fetch the list of games.
-    /// - Writes the list of games to the provided writer.
-    /// <side-effects-end>
+    // Executes the `list` plugin's logic.
+    //
+    // <purpose-start>
+    // This method is called by the core application when the `list` command is invoked.
+    // It fetches the list of games, applies any specified filters, and prints the formatted list to the console.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `&self`: A reference to the plugin instance.
+    // - `app_context`: The shared application context.
+    // - `matches`: The clap argument matches for the `list` subcommand.
+    // - `writer`: A mutable reference to a writer for standard output.
+    // - `err_writer`: A mutable reference to a writer for standard error.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - None.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - Makes a network request to the Steam API to fetch the list of games.
+    // - Writes the list of games to the provided writer.
+    // <side-effects-end>
     async fn execute(
         &self,
         app_context: &AppContext,

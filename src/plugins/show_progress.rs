@@ -27,24 +27,24 @@ pub struct ShowProgressPlugin;
 
 #[async_trait]
 impl Plugin for ShowProgressPlugin {
-    /// Defines the clap command for the `progress` plugin.
-    ///
-    /// <purpose-start>
-    /// This method provides the command-line interface for the `progress` plugin,
-    /// which displays the achievement progress for a specific game.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `&self`: A reference to the plugin instance.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - `clap::Command`: The clap command definition for the `progress` plugin.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - None.
-    /// <side-effects-end>
+    // Defines the clap command for the `progress` plugin.
+    //
+    // <purpose-start>
+    // This method provides the command-line interface for the `progress` plugin,
+    // which displays the achievement progress for a specific game.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `&self`: A reference to the plugin instance.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - `clap::Command`: The clap command definition for the `progress` plugin.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - None.
+    // <side-effects-end>
     fn command(&self) -> Command {
         Command::new("progress")
             .about("Displays game achievements progress.")
@@ -57,29 +57,29 @@ impl Plugin for ShowProgressPlugin {
             )
     }
 
-    /// Executes the `progress` plugin's logic.
-    ///
-    /// <purpose-start>
-    /// This method is called by the core application when the `progress` command is invoked.
-    /// It fetches the achievement data for a given game and displays a progress bar in the console.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `&self`: A reference to the plugin instance.
-    /// - `app_context`: The shared application context.
-    /// - `matches`: The clap argument matches for the `progress` subcommand.
-    /// - `writer`: A mutable reference to a writer for standard output.
-    /// - `err_writer`: A mutable reference to a writer for standard error.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - None.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - Makes a network request to the Steam API to fetch achievement data.
-    /// - Writes the progress bar to the provided writer.
-    /// <side-effects-end>
+    // Executes the `progress` plugin's logic.
+    //
+    // <purpose-start>
+    // This method is called by the core application when the `progress` command is invoked.
+    // It fetches the achievement data for a given game and displays a progress bar in the console.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `&self`: A reference to the plugin instance.
+    // - `app_context`: The shared application context.
+    // - `matches`: The clap argument matches for the `progress` subcommand.
+    // - `writer`: A mutable reference to a writer for standard output.
+    // - `err_writer`: A mutable reference to a writer for standard error.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - None.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - Makes a network request to the Steam API to fetch achievement data.
+    // - Writes the progress bar to the provided writer.
+    // <side-effects-end>
     async fn execute(
         &self,
         app_context: &AppContext,

@@ -27,24 +27,24 @@ pub struct ListAchievementsPlugin;
 
 #[async_trait]
 impl Plugin for ListAchievementsPlugin {
-    /// Defines the clap command for the `achievements` plugin.
-    ///
-    /// <purpose-start>
-    /// This method provides the command-line interface for the `achievements` plugin,
-    /// which allows users to list achievements for a specific game.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `&self`: A reference to the plugin instance.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - `clap::Command`: The clap command definition for the `achievements` plugin.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - None.
-    /// <side-effects-end>
+    // Defines the clap command for the `achievements` plugin.
+    //
+    // <purpose-start>
+    // This method provides the command-line interface for the `achievements` plugin,
+    // which allows users to list achievements for a specific game.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `&self`: A reference to the plugin instance.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - `clap::Command`: The clap command definition for the `achievements` plugin.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - None.
+    // <side-effects-end>
     fn command(&self) -> Command {
         Command::new("achievements")
             .about("Displays achievements for a specific game. Game id should be provided as an argument")
@@ -71,29 +71,29 @@ impl Plugin for ListAchievementsPlugin {
             )
     }
 
-    /// Executes the `achievements` plugin's logic.
-    ///
-    /// <purpose-start>
-    /// This method is called by the core application when the `achievements` command is invoked.
-    /// It fetches the list of achievements for a given game, applies any specified filters, and prints the list to the console.
-    /// <purpose-end>
-    ///
-    /// <inputs-start>
-    /// - `&self`: A reference to the plugin instance.
-    /// - `app_context`: The shared application context.
-    /// - `matches`: The clap argument matches for the `achievements` subcommand.
-    /// - `writer`: A mutable reference to a writer for standard output.
-    /// - `err_writer`: A mutable reference to a writer for standard error.
-    /// <inputs-end>
-    ///
-    /// <outputs-start>
-    /// - None.
-    /// <outputs-end>
-    ///
-    /// <side-effects-start>
-    /// - Makes network requests to the Steam API to fetch achievement data.
-    /// - Writes the list of achievements to the provided writer.
-    /// <side-effects-end>
+    // Executes the `achievements` plugin's logic.
+    //
+    // <purpose-start>
+    // This method is called by the core application when the `achievements` command is invoked.
+    // It fetches the list of achievements for a given game, applies any specified filters, and prints the list to the console.
+    // <purpose-end>
+    //
+    // <inputs-start>
+    // - `&self`: A reference to the plugin instance.
+    // - `app_context`: The shared application context.
+    // - `matches`: The clap argument matches for the `achievements` subcommand.
+    // - `writer`: A mutable reference to a writer for standard output.
+    // - `err_writer`: A mutable reference to a writer for standard error.
+    // <inputs-end>
+    //
+    // <outputs-start>
+    // - None.
+    // <outputs-end>
+    //
+    // <side-effects-start>
+    // - Makes network requests to the Steam API to fetch achievement data.
+    // - Writes the list of achievements to the provided writer.
+    // <side-effects-end>
     async fn execute(
         &self,
         app_context: &AppContext,
