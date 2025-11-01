@@ -46,6 +46,44 @@ Some possible usage examples:
 
 Run `trogue -h` for a full list of available options.
 
+# Shell Completion
+
+Trogue supports shell completion for bash and zsh. This enables tab completion for commands and their options.
+
+## Installation
+
+### Bash
+```bash
+# Generate completion script and append to ~/.bashrc
+echo '# trogue completion' >> ~/.bashrc
+trogue completions bash >> ~/.bashrc
+
+# Reload bash completion
+source ~/.bashrc
+```
+
+### Zsh
+```bash
+# Generate completion script
+trogue completions zsh > ~/.zsh/completions/_trogue
+
+# Add to ~/.zshrc if not already present:
+# fpath=(~/.zsh/completions $fpath)
+
+# Reload zsh completion
+source ~/.zshrc
+```
+
+## Usage
+
+After installation, you can use tab completion:
+
+```bash
+trogue <Tab>          # Shows: achievements completions dashboard list progress
+trogue ac<Tab>        # Autocompletes to: trogue achievements
+trogue list --<Tab>   # Shows available options: --filter --pattern --help
+```
+
 # Build
 
 To build the tool:
@@ -98,8 +136,8 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 
 - [x] Achievement card - name, status, date, progress
 - [x] CLI mode additionally to interactive mode
-- [ ] Game name search with typeahead in interactive mode
 - [ ] Game name tab completion in CLI mode
+- [ ] Game name search with typeahead in interactive mode
 - [ ] Add support for PSN
 - [ ] Add support for Xbox
 

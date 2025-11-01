@@ -10,6 +10,7 @@ The `trogue` application is a command-line interface (CLI) tool designed to inte
 - **List Achievements:** Show a list of all achievements for a specific game, with options to filter by achieved status and include global achievement percentages.
 - **Show Progress:** Display the achievement progress for a specific game as a progress bar.
 - **Dashboard:** Show a dashboard of the 10 most recently played games and their achievement progress.
+- **Shell Completions:** Generate shell completion scripts for bash, zsh, fish, and PowerShell to enable tab completion of commands.
 
 ## Architecture Overview
 
@@ -49,7 +50,7 @@ The heart of the plugin system. It is responsible for:
 - Defining the `Plugin` trait, which all plugins must implement. This trait standardizes how plugins define their commands and execute their logic.
 - Registering and providing a list of all available plugins to the `main` module.
 
-Each feature is implemented as a separate plugin module within the `src/plugins/` directory (e.g., `src/plugins/list_games.rs`, `src/plugins/dashboard.rs`).
+Each feature is implemented as a separate plugin module within the `src/plugins/` directory (e.g., `src/plugins/list_games.rs`, `src/plugins/dashboard.rs`, `src/plugins/completions.rs`).
 
 ### `cfg.rs`
 
@@ -66,3 +67,40 @@ A utility module that provides functions for displaying formatted output to the 
 ### `tui.rs`
 
 Contains a text-based user interface for selecting a game from a list. This module is currently unused but could be integrated into a plugin in the future.
+
+## Shell Completion
+
+The application includes a `completions` plugin that generates shell completion scripts. This feature enables tab completion for trogue commands in supported shells (bash, zsh, fish, and PowerShell).
+
+### How It Works
+
+1. The `completions` plugin uses the `clap_complete` crate to generate shell-specific completion scripts.
+2. When invoked with `trogue completions <shell>`, it outputs a completion script to stdout.
+3. Users redirect this output to their shell's completion directory and source it.
+4. After installation, the shell provides tab completion for all trogue commands and their arguments.
+
+### Installation
+
+**Bash:**
+```bash
+trogue completions bash >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Zsh:**
+```bash
+trogue completions zsh > ~/.zsh/completions/_trogue
+# Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
+source ~/.zshrc
+```
+
+### Example Usage
+
+After installation, users can use tab completion:
+```bash
+trogue <Tab>          # Shows: achievements completions dashboard list progress
+trogue ac<Tab>        # Autocompletes to: trogue achievements
+trogue list --<Tab>   # Shows: --filter --pattern --help
+```
+
+This significantly improves the user experience by reducing typing and helping users discover available commands and options.
