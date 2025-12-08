@@ -136,6 +136,9 @@ https://andshrew.github.io/PlayStation-Trophies/#/APIv2
 
 - [x] Achievement card - name, status, date, progress
 - [x] CLI mode additionally to interactive mode
+- [ ] List achievements by game name filter, display all matching games if multiple
+- [ ] Dashboard with all 100% games
+- [ ] Latest game dashboard - achievements progress, list remaining
 - [ ] Game name tab completion in CLI mode
 - [ ] Game name search with typeahead in interactive mode
 - [ ] Add support for PSN
