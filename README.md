@@ -40,11 +40,13 @@ Configuration is done through environment:
 # Usage
 
 Some possible usage examples:
-* `trogue -l` will list all games in the library, outputting game names only
-* `trogue -l redemption -p 'i - n'` will list games containing "redemption" in the name, and output game id and game name separated by hyphen
-* `trogue -a 48700` will display achievements for a specific game
+* `trogue list` will list all games in the library
+* `trogue list -f redemption -p 'i - n'` will list games containing "redemption" in the name, and output game id and game name separated by hyphen
+* `trogue achievements 48700` or `trogue achievements "fallout 4"` will display achievements for a specific game
+* `trogue achievements "fallout 4" -r` will display remaining locked achievements for a specific game
+* `trogue dashboard` will display a dashboard with 10 last played games and their achievement progress
 
-Run `trogue -h` for a full list of available options.
+Run `trogue --help` for a full list of available commands and options.
 
 # Shell Completion
 
