@@ -55,7 +55,7 @@ impl Plugin for ListGamesPlugin {
                     .value_name("filter")
                     .action(clap::ArgAction::Set)
                     .num_args(0..=1)
-                    .help("Displays a list of all games on account set in environment variables"),
+                    .help("Filters the list of games by name"),
             )
             .arg(
                 Arg::new("pattern")
