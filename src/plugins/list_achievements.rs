@@ -47,13 +47,13 @@ impl Plugin for ListAchievementsPlugin {
     // <side-effects-end>
     fn command(&self) -> Command {
         Command::new("achievements")
-            .about("Displays achievements for a specific game. Game id should be provided as an argument")
+            .about("Displays achievements for a specific game. Game ID or part of game title should be provided as an argument")
             .arg(
-                Arg::new("game_id")
-                    .value_name("game_id")
+                Arg::new("game")
+                    .value_name("game")
                     .action(clap::ArgAction::Set)
                     .required(true)
-                    .help("The ID of the game to list achievements for"),
+                    .help("The ID of the game or part of game title to list achievements for"),
             )
             .arg(
                 Arg::new("global")
@@ -101,57 +101,96 @@ impl Plugin for ListAchievementsPlugin {
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
     ) {
-        let game_id_str = matches.get_one::<String>("game_id").unwrap();
+        let game_arg = matches.get_one::<String>("game").unwrap();
         let add_global = matches.get_flag("global");
         let remaining = matches.get_flag("remaining");
 
-        if let Ok(game_id) = game_id_str.parse::<u32>() {
-            let mut achievements = Vec::new();
-
-            match app_context.api.get_game_achievements(game_id).await {
-                Ok((_, achs)) => achievements = achs,
-                Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
+        let games = match app_context.api.get_games_list().await {
+            Ok(g) => g,
+            Err(e) => {
+                writeln!(err_writer, "Error while trying to get games list: {}", e).unwrap();
+                return;
             }
+        };
 
-            let mut global_achievement_map = std::collections::HashMap::new();
-            if add_global {
-                match app_context.api.get_global_achievements(game_id).await {
-                    Ok(resp) => {
-                        for global_achievement in resp {
-                            global_achievement_map
-                                .insert(global_achievement.name.clone(), global_achievement.percent);
-                        }
+        let mut resolved_game_id = None;
+
+        // 1. Try numeric match
+        if let Ok(game_id) = game_arg.parse::<u32>() {
+            if games.iter().any(|g| g.appid == game_id) {
+                resolved_game_id = Some(game_id);
+            }
+        }
+
+        // 2. Try substring match if not resolved
+        if resolved_game_id.is_none() {
+            let matches: Vec<_> = games
+                .iter()
+                .filter(|g| g.name.to_lowercase().contains(&game_arg.to_lowercase()))
+                .collect();
+
+            match matches.len() {
+                0 => {
+                    writeln!(err_writer, "Game not found: {}", game_arg).unwrap();
+                    return;
+                }
+                1 => {
+                    resolved_game_id = Some(matches[0].appid);
+                }
+                _ => {
+                    writeln!(writer, "Multiple games match '{}':", game_arg).unwrap();
+                    for m in matches {
+                        writeln!(writer, " - {}", m.name).unwrap();
                     }
-                    Err(e) => writeln!(err_writer, "Error while trying to get global achievements: {}", e).unwrap(),
+                    return;
                 }
             }
+        }
 
-            for achievement in achievements {
-                if remaining && achievement.achieved > 0 {
-                    continue;
+        let game_id = resolved_game_id.unwrap();
+        let mut achievements = Vec::new();
+
+        match app_context.api.get_game_achievements(game_id).await {
+            Ok((_, achs)) => achievements = achs,
+            Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
+        }
+
+        let mut global_achievement_map = std::collections::HashMap::new();
+        if add_global {
+            match app_context.api.get_global_achievements(game_id).await {
+                Ok(resp) => {
+                    for global_achievement in resp {
+                        global_achievement_map
+                            .insert(global_achievement.name.clone(), global_achievement.percent);
+                    }
                 }
-
-                let displayable_achievement = ui::DisplayableAchievement { achievement };
-
-                let mut title: String;
-                if displayable_achievement.achievement.achieved > 0 {
-                    title = displayable_achievement.format("n - s (t)");
-                } else {
-                    title = displayable_achievement.format("n");
-                }
-
-                if add_global {
-                    let global_percent = global_achievement_map
-                        .get(&displayable_achievement.achievement.apiname)
-                        .unwrap_or(&0.0);
-
-                    title.push_str(&format!(" {}%", global_percent));
-                }
-
-                writeln!(writer, "{}", title).unwrap();
+                Err(e) => writeln!(err_writer, "Error while trying to get global achievements: {}", e).unwrap(),
             }
-        } else {
-            writeln!(err_writer, "Invalid game id: {}", game_id_str).unwrap();
+        }
+
+        for achievement in achievements {
+            if remaining && achievement.achieved > 0 {
+                continue;
+            }
+
+            let displayable_achievement = ui::DisplayableAchievement { achievement };
+
+            let mut title: String;
+            if displayable_achievement.achievement.achieved > 0 {
+                title = displayable_achievement.format("n - s (t)");
+            } else {
+                title = displayable_achievement.format("n");
+            }
+
+            if add_global {
+                let global_percent = global_achievement_map
+                    .get(&displayable_achievement.achievement.apiname)
+                    .unwrap_or(&0.0);
+
+                title.push_str(&format!(" {}%", global_percent));
+            }
+
+            writeln!(writer, "{}", title).unwrap();
         }
     }
 }
@@ -161,8 +200,22 @@ impl Plugin for ListAchievementsPlugin {
 mod tests {
     use super::*;
     use crate::app::AppContext;
-    use crate::steam_api::{Api, Achievement, GlobalAchievement};
+    use crate::steam_api::{Api, Achievement, GlobalAchievement, Game};
     use clap::ArgMatches;
+
+    fn create_mock_game(appid: u32, name: &str) -> Game {
+        Game {
+            appid,
+            name: name.to_string(),
+            playtime_forever: 0,
+            img_icon_url: "".to_string(),
+            playtime_windows_forever: 0,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played: 0,
+            playtime_disconnected: 0,
+        }
+    }
 
     fn create_mock_achievement(apiname: &str, name: &str, achieved: u8) -> Achievement {
         Achievement {
@@ -181,24 +234,18 @@ mod tests {
         }
     }
 
-    async fn setup_test_env_game_achievements(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
-        let mut server = mockito::Server::new_async().await;
-        server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=123&key=test_key&steamid=test_id&l=en")
-            .with_status(status_code as usize)
-            .with_header("content-type", "application/json")
-            .with_body(mock_body)
-            .create_async().await;
-
-        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
-        let app_context = AppContext { api };
-        (app_context, server)
-    }
-
-    async fn setup_test_env_with_global(
+    async fn setup_test_env_complete(
+        games_body: &str, games_status: u16,
         game_ach_body: &str, game_ach_status: u16,
         global_ach_body: &str, global_ach_status: u16
     ) -> (AppContext, mockito::ServerGuard) {
         let mut server = mockito::Server::new_async().await;
+
+        server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+            .with_status(games_status as usize)
+            .with_header("content-type", "application/json")
+            .with_body(games_body)
+            .create_async().await;
 
         server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=123&key=test_key&steamid=test_id&l=en")
             .with_status(game_ach_status as usize)
@@ -217,6 +264,25 @@ mod tests {
         (app_context, server)
     }
 
+    async fn setup_test_env_game_achievements(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
+        let games = vec![create_mock_game(123, "Test Game")];
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 1, "games": games }
+        })).unwrap();
+        setup_test_env_complete(&games_body, 200, mock_body, status_code, "", 500).await
+    }
+
+    async fn setup_test_env_with_global(
+        game_ach_body: &str, game_ach_status: u16,
+        global_ach_body: &str, global_ach_status: u16
+    ) -> (AppContext, mockito::ServerGuard) {
+        let games = vec![create_mock_game(123, "Test Game")];
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 1, "games": games }
+        })).unwrap();
+        setup_test_env_complete(&games_body, 200, game_ach_body, game_ach_status, global_ach_body, global_ach_status).await
+    }
+
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
         ListAchievementsPlugin.command().get_matches_from(args)
     }
@@ -227,7 +293,7 @@ mod tests {
         let cmd = plugin.command();
         assert_eq!(cmd.get_name(), "achievements");
         assert!(cmd.get_about().is_some());
-        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "game_id"));
+        assert!(cmd.get_arguments().any(|arg| arg.get_id() == "game"));
         assert!(cmd.get_arguments().any(|arg| arg.get_id() == "global"));
         assert!(cmd.get_arguments().any(|arg| arg.get_id() == "remaining"));
     }
@@ -259,16 +325,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_execute_invalid_game_id() {
-        let (app_context, _server) = setup_test_env_game_achievements("", 200).await;
-        let matches = get_matches_for_args(&["achievements", "invalid"]);
+    async fn test_execute_game_not_found() {
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 0, "games": [] }
+        })).unwrap();
+        let (app_context, _server) = setup_test_env_complete(&games_body, 200, "", 200, "", 500).await;
+        let matches = get_matches_for_args(&["achievements", "unknown"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
 
         let output = String::from_utf8(err_writer).unwrap();
-        assert_eq!(output.trim(), "Invalid game id: invalid");
+        assert!(output.contains("Game not found: unknown"));
     }
 
     #[tokio::test]
@@ -392,5 +461,95 @@ mod tests {
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("First Achievement"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_substring_success() {
+        let games = vec![create_mock_game(123, "Specific Game Title")];
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 1, "games": games }
+        })).unwrap();
+        let achievements = vec![create_mock_achievement("ach1", "Achievement 1", 1)];
+        let ach_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Specific Game Title",
+                "achievements": achievements,
+                "success": true
+            }
+        })).unwrap();
+        
+        let (app_context, _server) = setup_test_env_complete(&games_body, 200, &ach_body, 200, "", 500).await;
+        let matches = get_matches_for_args(&["achievements", "specific"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Achievement 1"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_multiple_matches() {
+        let games = vec![
+            create_mock_game(123, "Game One"),
+            create_mock_game(456, "Game Two"),
+        ];
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 2, "games": games }
+        })).unwrap();
+        
+        let (app_context, _server) = setup_test_env_complete(&games_body, 200, "", 200, "", 500).await;
+        let matches = get_matches_for_args(&["achievements", "Game"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Multiple games match 'Game':"));
+        assert!(output.contains("Game One"));
+        assert!(output.contains("Game Two"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_numeric_id_not_in_library_fallback() {
+        let games = vec![create_mock_game(456, "Game 123")];
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 1, "games": games }
+        })).unwrap();
+        let achievements = vec![create_mock_achievement("ach1", "Achievement from fallback", 1)];
+        let ach_body = serde_json::to_string(&serde_json::json!({
+            "playerstats": {
+                "steamID": "test_id",
+                "gameName": "Game 123",
+                "achievements": achievements,
+                "success": true
+            }
+        })).unwrap();
+        
+        // Mocking ISteamUserStats/GetPlayerAchievements for appid 123
+        let mut server = mockito::Server::new_async().await;
+        server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+            .with_status(200)
+            .with_body(games_body)
+            .create_async().await;
+        server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=456&key=test_key&steamid=test_id&l=en")
+            .with_status(200)
+            .with_body(ach_body)
+            .create_async().await;
+
+        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
+        let app_context = AppContext { api };
+
+        let matches = get_matches_for_args(&["achievements", "123"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.contains("Achievement from fallback"));
     }
 }
