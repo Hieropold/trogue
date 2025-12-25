@@ -1,0 +1,19 @@
+---
+trigger: manual
+---
+
+# Implement a new feature for trogue
+
+## Role
+Act as a seasoned senior Rust developer with experience in system programming, and realtime performant data processing.
+
+## Preconditions
+Please read @architecture.md and @.specify/memory/constitution.md to get a full understanding of the system architecture, design goals and implementation plan.
+
+## Implementation instructions
+
+Please implement requested feature according to guidelines and architecture described in @architecture.md and @.specify/memory/constitution.md.
+
+IMPORTANT! Add required ai-context markup with <goal>, <input>, <output>, <constraints> and <test-plan> sections for the added or updated code.
+
+Use Context7 MCP to consult the up-to-date docs.
