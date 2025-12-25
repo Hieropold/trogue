@@ -66,7 +66,7 @@ async fn main() {
 
     let mut command = Command::new("trogue")
         .version(env!("CARGO_PKG_VERSION"))
-        .author("Hieropold <unsolicited.pcholler@gmail.com>")
+        .author("Hieropold <hieropold@gmail.com>")
         .about("A CLI tool for displaying Steam achievements");
 
     for plugin in &plugins {

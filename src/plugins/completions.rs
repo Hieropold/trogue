@@ -125,7 +125,7 @@ impl Plugin for CompletionsPlugin {
         // Build the complete command structure with all subcommands
         let mut cmd = Command::new("trogue")
             .version("1.0")
-            .author("Hieropold <unsolicited.pcholler@gmail.com>")
+            .author("Hieropold <hieropold@gmail.com>")
             .about("A CLI tool for displaying Steam achievements");
 
         // Add all plugin commands
