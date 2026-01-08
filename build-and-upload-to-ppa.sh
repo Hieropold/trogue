@@ -3,10 +3,11 @@
 # Exit on error
 set -e
 
-# Copy original changelog to restore later
+# Store original changelog in a variable to restore later
 # This ensures that our temporary modifications for the build don't persist
-cp debian/changelog debian/changelog.orig
-trap "mv debian/changelog.orig debian/changelog" EXIT
+# and avoids issues with dh_clean deleting backup files.
+ORIG_CHANGELOG=$(cat debian/changelog)
+trap 'printf "%s" "$ORIG_CHANGELOG" > debian/changelog' EXIT
 
 # Set maintainer information for dch
 export DEBFULLNAME="Hieropold"
@@ -30,7 +31,7 @@ for DISTRO in jammy noble; do
     echo "----------------------------------------------------------------"
 
     # Reset changelog to original state for this iteration
-    cp debian/changelog.orig debian/changelog
+    printf "%s" "$ORIG_CHANGELOG" > debian/changelog
 
     # Update debian/changelog for specific distribution
     # Append ~distro1 to version to ensure uniqueness and correct targeting
