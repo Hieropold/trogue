@@ -100,6 +100,11 @@ or
 cargo run
 ```
 
+If it complains about missing vendor folder, run:
+```
+cargo vendor
+```
+
 To format code:
 ```
 cargo fmt
