@@ -3,10 +3,8 @@ Section: misc
 Priority: optional
 Maintainer: Hieropold <hieropold@gmail.com>
 Build-Depends: debhelper-compat (= 13),
-               dh-cargo,
                cargo,
-               rustc,
-               pkg-config
+               rustc
 Standards-Version: 4.6.0
 Homepage: https://github.com/hieropold/trogue
 

@@ -128,6 +128,12 @@ Run the tests with coverage.
 cargo tarpaulin --out Html -- --test-threads=1
 ```
 
+# PPA
+```
+sudo apt install devscripts dput debhelper dh-cargo
+./build-and-upload-to-ppa.sh
+```
+
 # Development
 
 ## Steam

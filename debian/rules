@@ -1,12 +1,9 @@
 #!/usr/bin/make -f
 
-export DH_CARGO_VENDORED_SOURCES=1
-
 %:
-	dh $@ --with cargo
+	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure
 	# Remove incompatible Cargo.lock and let cargo use vendored deps
 	rm -f Cargo.lock
 
