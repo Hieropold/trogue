@@ -1,11 +1,8 @@
-# Trogue — Claude Agent Instructions
+# Trogue — AI Agent Instructions
 
 ## Project Overview
 
 `trogue` is a CLI tool written in **Rust** that interacts with the Steam API. It lets users view owned games, achievements, achievement progress, and a dashboard of recently played games.
-
-**Current version:** 0.2.2
-**License:** Apache
 
 ---
 
