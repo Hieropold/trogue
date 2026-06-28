@@ -164,3 +164,5 @@ To create a Debian package and upload it to a Launchpad PPA:
 ```bash
 ./build-and-upload-to-ppa.sh
 ```
+
+For more detailed publishing instructions (including crates.io), see [PUBLISHING.md](PUBLISHING.md).

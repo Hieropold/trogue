@@ -4,7 +4,12 @@ version = "0.2.4"
 edition = "2021"
 description = "A terminal-based client for viewing Steam achievements."
 authors = ["Hieropold <hieropold@gmail.com>"]
-license = "Apache"
+license = "MIT"
+repository = "https://github.com/Hieropold/trogue"
+readme = "README.md"
+keywords = ["steam", "achievements", "cli", "tui", "games"]
+categories = ["command-line-utilities", "games-development"]
+
 
 [dependencies]
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
