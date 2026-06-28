@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Implement a feature end-to-end using a tracer-bullet TDD loop while treating the feature source as read-only context. The source can be a Jira ticket, Github issue, file with specs, or plain prompt text. Use when the user wants a feature built, mentions an issue key, specifies a spec file, or provides a text prompt description.
+description: "[scaffoldai] Implement a feature end-to-end using a tracer-bullet TDD loop while treating the feature source as read-only context. The source can be a Jira ticket, Github issue, file with specs, or plain prompt text. Use when the user wants a feature built, mentions an issue key, specifies a spec file, or provides a text prompt description."
 ---
 
 # Implement Feature
