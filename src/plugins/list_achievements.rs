@@ -152,7 +152,9 @@ impl Plugin for ListAchievementsPlugin {
 
         match app_context.api.get_game_achievements(game_id).await {
             Ok((_, achs)) => achievements = achs,
-            Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
+            Err(e) => {
+                writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap()
+            }
         }
 
         let mut global_achievement_map = std::collections::HashMap::new();
@@ -164,7 +166,12 @@ impl Plugin for ListAchievementsPlugin {
                             .insert(global_achievement.name.clone(), global_achievement.percent);
                     }
                 }
-                Err(e) => writeln!(err_writer, "Error while trying to get global achievements: {}", e).unwrap(),
+                Err(e) => writeln!(
+                    err_writer,
+                    "Error while trying to get global achievements: {}",
+                    e
+                )
+                .unwrap(),
             }
         }
 
@@ -195,12 +202,11 @@ impl Plugin for ListAchievementsPlugin {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::app::AppContext;
-    use crate::steam_api::{Api, Achievement, GlobalAchievement, Game};
+    use crate::steam_api::{Achievement, Api, Game, GlobalAchievement};
     use clap::ArgMatches;
 
     fn create_mock_game(appid: u32, name: &str) -> Game {
@@ -235,9 +241,12 @@ mod tests {
     }
 
     async fn setup_test_env_complete(
-        games_body: &str, games_status: u16,
-        game_ach_body: &str, game_ach_status: u16,
-        global_ach_body: &str, global_ach_status: u16
+        games_body: &str,
+        games_status: u16,
+        game_ach_body: &str,
+        game_ach_status: u16,
+        global_ach_body: &str,
+        global_ach_status: u16,
     ) -> (AppContext, mockito::ServerGuard) {
         let mut server = mockito::Server::new_async().await;
 
@@ -264,23 +273,38 @@ mod tests {
         (app_context, server)
     }
 
-    async fn setup_test_env_game_achievements(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
-        let games = vec![create_mock_game(123, "Test Game")];
-        let games_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 1, "games": games }
-        })).unwrap();
-        setup_test_env_complete(&games_body, 200, mock_body, status_code, "", 500).await
-    }
-
-    async fn setup_test_env_with_global(
-        game_ach_body: &str, game_ach_status: u16,
-        global_ach_body: &str, global_ach_status: u16
+    async fn setup_test_env_game_achievements(
+        mock_body: &str,
+        status_code: u16,
     ) -> (AppContext, mockito::ServerGuard) {
         let games = vec![create_mock_game(123, "Test Game")];
         let games_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 1, "games": games }
-        })).unwrap();
-        setup_test_env_complete(&games_body, 200, game_ach_body, game_ach_status, global_ach_body, global_ach_status).await
+        }))
+        .unwrap();
+        setup_test_env_complete(&games_body, 200, mock_body, status_code, "", 500).await
+    }
+
+    async fn setup_test_env_with_global(
+        game_ach_body: &str,
+        game_ach_status: u16,
+        global_ach_body: &str,
+        global_ach_status: u16,
+    ) -> (AppContext, mockito::ServerGuard) {
+        let games = vec![create_mock_game(123, "Test Game")];
+        let games_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 1, "games": games }
+        }))
+        .unwrap();
+        setup_test_env_complete(
+            &games_body,
+            200,
+            game_ach_body,
+            game_ach_status,
+            global_ach_body,
+            global_ach_status,
+        )
+        .await
     }
 
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
@@ -311,13 +335,16 @@ mod tests {
                 "achievements": achievements,
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env_game_achievements(&mock_body, 200).await;
         let matches = get_matches_for_args(&["achievements", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("First Achievement"));
@@ -328,13 +355,17 @@ mod tests {
     async fn test_execute_game_not_found() {
         let games_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 0, "games": [] }
-        })).unwrap();
-        let (app_context, _server) = setup_test_env_complete(&games_body, 200, "", 200, "", 500).await;
+        }))
+        .unwrap();
+        let (app_context, _server) =
+            setup_test_env_complete(&games_body, 200, "", 200, "", 500).await;
         let matches = get_matches_for_args(&["achievements", "unknown"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(err_writer).unwrap();
         assert!(output.contains("Game not found: unknown"));
@@ -347,7 +378,9 @@ mod tests {
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(err_writer).unwrap();
         assert!(output.contains("Error while trying to get achievements"));
@@ -362,13 +395,16 @@ mod tests {
                 "achievements": [],
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env_game_achievements(&mock_body, 200).await;
         let matches = get_matches_for_args(&["achievements", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert_eq!(output.trim(), "");
@@ -387,13 +423,16 @@ mod tests {
                 "achievements": achievements,
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env_game_achievements(&mock_body, 200).await;
         let matches = get_matches_for_args(&["achievements", "123", "--remaining"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(!output.contains("First Achievement"));
@@ -413,7 +452,8 @@ mod tests {
                 "achievements": game_achievements,
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
 
         let global_achievements = vec![
             create_mock_global_achievement("ach1", 50.5),
@@ -421,14 +461,18 @@ mod tests {
         ];
         let global_ach_body = serde_json::to_string(&serde_json::json!({
             "achievementpercentages": { "achievements": global_achievements }
-        })).unwrap();
+        }))
+        .unwrap();
 
-        let (app_context, _server) = setup_test_env_with_global(&game_ach_body, 200, &global_ach_body, 200).await;
+        let (app_context, _server) =
+            setup_test_env_with_global(&game_ach_body, 200, &global_ach_body, 200).await;
         let matches = get_matches_for_args(&["achievements", "123", "--global"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("First Achievement"));
@@ -447,14 +491,17 @@ mod tests {
                 "achievements": game_achievements,
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
 
         let (app_context, _server) = setup_test_env_with_global(&game_ach_body, 200, "", 500).await;
         let matches = get_matches_for_args(&["achievements", "123", "--global"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let err_output = String::from_utf8(err_writer).unwrap();
         assert!(err_output.contains("Error while trying to get global achievements"));
@@ -468,7 +515,8 @@ mod tests {
         let games = vec![create_mock_game(123, "Specific Game Title")];
         let games_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 1, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
         let achievements = vec![create_mock_achievement("ach1", "Achievement 1", 1)];
         let ach_body = serde_json::to_string(&serde_json::json!({
             "playerstats": {
@@ -477,14 +525,18 @@ mod tests {
                 "achievements": achievements,
                 "success": true
             }
-        })).unwrap();
-        
-        let (app_context, _server) = setup_test_env_complete(&games_body, 200, &ach_body, 200, "", 500).await;
+        }))
+        .unwrap();
+
+        let (app_context, _server) =
+            setup_test_env_complete(&games_body, 200, &ach_body, 200, "", 500).await;
         let matches = get_matches_for_args(&["achievements", "specific"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Achievement 1"));
@@ -498,14 +550,18 @@ mod tests {
         ];
         let games_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 2, "games": games }
-        })).unwrap();
-        
-        let (app_context, _server) = setup_test_env_complete(&games_body, 200, "", 200, "", 500).await;
+        }))
+        .unwrap();
+
+        let (app_context, _server) =
+            setup_test_env_complete(&games_body, 200, "", 200, "", 500).await;
         let matches = get_matches_for_args(&["achievements", "Game"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Multiple games match 'Game':"));
@@ -518,8 +574,13 @@ mod tests {
         let games = vec![create_mock_game(456, "Game 123")];
         let games_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 1, "games": games }
-        })).unwrap();
-        let achievements = vec![create_mock_achievement("ach1", "Achievement from fallback", 1)];
+        }))
+        .unwrap();
+        let achievements = vec![create_mock_achievement(
+            "ach1",
+            "Achievement from fallback",
+            1,
+        )];
         let ach_body = serde_json::to_string(&serde_json::json!({
             "playerstats": {
                 "steamID": "test_id",
@@ -527,8 +588,9 @@ mod tests {
                 "achievements": achievements,
                 "success": true
             }
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         // Mocking ISteamUserStats/GetPlayerAchievements for appid 123
         let mut server = mockito::Server::new_async().await;
         server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
@@ -547,7 +609,9 @@ mod tests {
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListAchievementsPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListAchievementsPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Achievement from fallback"));

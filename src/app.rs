@@ -1,4 +1,4 @@
-use crate::{cfg::Cfg, steam_api::Api, constants};
+use crate::{cfg::Cfg, constants, steam_api::Api};
 
 // The main application structure.
 //

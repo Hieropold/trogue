@@ -23,14 +23,14 @@ use crate::app::AppContext;
 use async_trait::async_trait;
 use std::io::Write;
 
-pub mod list_games;
+pub mod completions;
 pub mod dashboard;
 pub mod list_achievements;
+pub mod list_games;
 pub mod show_progress;
-pub mod completions;
 
 #[async_trait]
-pub trait Plugin {
+pub trait Plugin: Send + Sync {
     // Defines the clap command for the plugin.
     //
     // <purpose-start>
@@ -80,6 +80,16 @@ pub trait Plugin {
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
     );
+
+    // Deepened execute that returns structured domain data (ViewData).
+    // This allows decoupling CLI parsing and terminal rendering from the plugin.
+    async fn execute_deep(
+        &self,
+        _app_context: &AppContext,
+        _matches: &clap::ArgMatches,
+    ) -> Result<crate::ui::ViewData, String> {
+        Ok(crate::ui::ViewData::None)
+    }
 }
 
 pub fn get_plugins() -> Vec<Box<dyn Plugin>> {
@@ -117,7 +127,7 @@ mod tests {
     #[test]
     fn test_get_plugins() {
         let plugins = get_plugins();
-        
+
         // Expected number of plugins.
         assert_eq!(plugins.len(), 5);
 
@@ -130,7 +140,10 @@ mod tests {
         ];
         expected_names.sort();
 
-        let mut actual_names: Vec<String> = plugins.iter().map(|p| p.command().get_name().to_string()).collect();
+        let mut actual_names: Vec<String> = plugins
+            .iter()
+            .map(|p| p.command().get_name().to_string())
+            .collect();
         actual_names.sort();
 
         assert_eq!(actual_names, expected_names);

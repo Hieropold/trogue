@@ -133,7 +133,7 @@ impl Api {
     pub async fn get_games_list(&self) -> Result<Vec<Game>, reqwest::Error> {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
-        
+
         let url = format!("{}/IPlayerService/GetOwnedGames/v0001/?key={api_key}&steamid={steam_id}&format=json&include_appinfo=1", self.base_url);
 
         let response = reqwest::get(url).await?;
@@ -164,7 +164,10 @@ impl Api {
     // <side-effects-start>
     // - **Network request**: Sends a GET request to the Steam API.
     // <side-effects-end>
-    pub async fn get_game_achievements(&self, appid: u32) -> Result<(String, Vec<Achievement>), reqwest::Error> {
+    pub async fn get_game_achievements(
+        &self,
+        appid: u32,
+    ) -> Result<(String, Vec<Achievement>), reqwest::Error> {
         let api_key = self.api_key.clone();
         let steam_id = self.steam_id.clone();
 
@@ -198,7 +201,10 @@ impl Api {
     // <side-effects-start>
     // - **Network request**: Sends a GET request to the Steam API.
     // <side-effects-end>
-    pub async fn get_global_achievements(&self, appid: u32) -> Result<Vec<GlobalAchievement>, reqwest::Error> {
+    pub async fn get_global_achievements(
+        &self,
+        appid: u32,
+    ) -> Result<Vec<GlobalAchievement>, reqwest::Error> {
         let url = format!("{}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid={appid}&format=json&l=en", self.base_url);
 
         let response = reqwest::get(url).await?;

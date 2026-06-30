@@ -130,6 +130,29 @@ E.g.: -p "i: n""#,
             writeln!(writer, "{}", formatted_game).unwrap();
         }
     }
+
+    // Executes the `list` plugin's logic and returns structured data.
+    async fn execute_deep(
+        &self,
+        app_context: &AppContext,
+        matches: &clap::ArgMatches,
+    ) -> Result<crate::ui::ViewData, String> {
+        let filter = matches.get_one::<String>("filter").cloned();
+        let pattern = matches.get_one::<String>("pattern").cloned();
+
+        let mut games = match app_context.api.get_games_list().await {
+            Ok(resp) => resp,
+            Err(e) => return Err(format!("Error while trying to get Steam data: {}", e)),
+        };
+
+        if let Some(ref f) = filter {
+            games.retain(|entry| entry.name.to_lowercase().contains(&f.to_lowercase()));
+        }
+
+        let pattern = pattern.unwrap_or("[i] n".to_string());
+
+        Ok(crate::ui::ViewData::ListGames(games, filter, pattern))
+    }
 }
 
 #[cfg(test)]
@@ -153,7 +176,10 @@ mod tests {
         }
     }
 
-    async fn setup_test_env(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
+    async fn setup_test_env(
+        mock_body: &str,
+        status_code: u16,
+    ) -> (AppContext, mockito::ServerGuard) {
         let mut server = mockito::Server::new_async().await;
         server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
             .with_status(status_code as usize)
@@ -185,13 +211,16 @@ mod tests {
         let games = vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")];
         let mock_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 2, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env(&mock_body, 200).await;
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListGamesPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying all games:"));
@@ -201,16 +230,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success_with_filter() {
-        let games = vec![create_mock_game(1, "Awesome Game"), create_mock_game(2, "Another Game")];
+        let games = vec![
+            create_mock_game(1, "Awesome Game"),
+            create_mock_game(2, "Another Game"),
+        ];
         let mock_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 2, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env(&mock_body, 200).await;
         let matches = get_matches_for_args(&["list", "--filter", "Awesome"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListGamesPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying games filtered by: Awesome"));
@@ -223,13 +258,16 @@ mod tests {
         let games = vec![create_mock_game(1, "Awesome Game")];
         let mock_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 1, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env(&mock_body, 200).await;
         let matches = get_matches_for_args(&["list", "--filter", "Awesome", "--pattern", "i - n"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListGamesPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying games filtered by: Awesome"));
@@ -243,7 +281,9 @@ mod tests {
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListGamesPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(err_writer).unwrap();
         assert!(output.contains("Error while trying to get Steam data"));
@@ -253,16 +293,44 @@ mod tests {
     async fn test_execute_no_games() {
         let mock_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 0, "games": [] }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env(&mock_body, 200).await;
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ListGamesPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ListGamesPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying all games:"));
         assert!(!output.contains("[")); // No games should be listed
+    }
+
+    #[tokio::test]
+    async fn test_execute_deep_success_no_filter() {
+        let games = vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")];
+        let mock_body = serde_json::to_string(&serde_json::json!({
+            "response": { "game_count": 2, "games": games }
+        }))
+        .unwrap();
+        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let matches = get_matches_for_args(&["list"]);
+
+        let result = ListGamesPlugin
+            .execute_deep(&app_context, &matches)
+            .await
+            .unwrap();
+
+        match result {
+            crate::ui::ViewData::ListGames(games, filter, pattern) => {
+                assert_eq!(games.len(), 2);
+                assert_eq!(filter, None);
+                assert_eq!(pattern, "[i] n");
+            }
+            _ => panic!("Expected ListGames ViewData"),
+        }
     }
 }

@@ -118,7 +118,9 @@ impl Plugin for ShowProgressPlugin {
                     }
                     writeln!(writer, "] {:.1}% ({}/{})", percentage, completed, total).unwrap();
                 }
-                Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
+                Err(e) => {
+                    writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap()
+                }
             }
         } else {
             writeln!(err_writer, "Invalid game id: {}", game_id_str).unwrap();
@@ -126,12 +128,11 @@ impl Plugin for ShowProgressPlugin {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::app::AppContext;
-    use crate::steam_api::{Api, Achievement};
+    use crate::steam_api::{Achievement, Api};
     use clap::ArgMatches;
 
     fn create_mock_achievement(achieved: u8) -> Achievement {
@@ -144,7 +145,10 @@ mod tests {
         }
     }
 
-    async fn setup_test_env(mock_body: &str, status_code: u16) -> (AppContext, mockito::ServerGuard) {
+    async fn setup_test_env(
+        mock_body: &str,
+        status_code: u16,
+    ) -> (AppContext, mockito::ServerGuard) {
         let mut server = mockito::Server::new_async().await;
         server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=123&key=test_key&steamid=test_id&l=en")
             .with_status(status_code as usize)
@@ -180,13 +184,16 @@ mod tests {
                 "achievements": achievements,
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env(&mock_body, 200).await;
         let matches = get_matches_for_args(&["progress", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ShowProgressPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ShowProgressPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.starts_with("Test Game"));
@@ -202,13 +209,16 @@ mod tests {
                 "achievements": [],
                 "success": true
             }
-        })).unwrap();
+        }))
+        .unwrap();
         let (app_context, _server) = setup_test_env(&mock_body, 200).await;
         let matches = get_matches_for_args(&["progress", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ShowProgressPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ShowProgressPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.starts_with("Test Game"));
@@ -222,7 +232,9 @@ mod tests {
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ShowProgressPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ShowProgressPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(err_writer).unwrap();
         assert!(output.contains("Error while trying to get achievements"));
@@ -235,7 +247,9 @@ mod tests {
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        ShowProgressPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        ShowProgressPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(err_writer).unwrap();
         assert_eq!(output.trim(), "Invalid game id: invalid");

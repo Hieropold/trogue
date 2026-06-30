@@ -158,7 +158,11 @@ impl DisplayableAchievement {
                 'i' => result.push_str(&self.achievement.apiname),
                 'n' => result.push_str(&self.achievement.name),
                 'd' => result.push_str(&self.achievement.description),
-                's' => result.push_str(if self.achievement.achieved > 0 { "Y" } else { "N" }),
+                's' => result.push_str(if self.achievement.achieved > 0 {
+                    "Y"
+                } else {
+                    "N"
+                }),
                 't' => result.push_str(&self.formatted_unlocktime()),
                 _ => result.push(ch),
             }
@@ -186,7 +190,11 @@ impl DisplayableAchievement {
     // <side-effects-end>
     pub fn render_card(&self) -> String {
         let mut card = String::new();
-        let achieved = if self.achievement.achieved == 1 { "Y" } else { "N" };
+        let achieved = if self.achievement.achieved == 1 {
+            "Y"
+        } else {
+            "N"
+        };
         let unlock_date = self.formatted_unlocktime();
 
         let apiname_length = self.achievement.apiname.len();
@@ -206,7 +214,10 @@ impl DisplayableAchievement {
         }
         card.push_str("┐\n");
 
-        card.push_str(&format!("│ Name: {:>longest_length$} │\n", self.achievement.apiname));
+        card.push_str(&format!(
+            "│ Name: {:>longest_length$} │\n",
+            self.achievement.apiname
+        ));
 
         let achieved_width = longest_length - 4;
         card.push_str(&format!(
@@ -347,5 +358,38 @@ mod tests {
         let card = displayable_achievement.render_card();
         let expected_card = "┌───────────────────────────┐\n│ Name:            test_api │\n│ Achieved:               N │\n│ Date: 1970-01-01 00:00:00 │\n└───────────────────────────┘\n";
         assert_eq!(card, expected_card);
+    }
+}
+
+pub enum ViewData {
+    ListGames(Vec<Game>, Option<String>, String), // games, filter, pattern
+    None,
+}
+
+pub struct Renderer;
+
+impl Renderer {
+    pub fn render(
+        view_data: ViewData,
+        writer: &mut (dyn std::io::Write + Send),
+    ) -> std::io::Result<()> {
+        match view_data {
+            ViewData::ListGames(games, filter, pattern) => {
+                match filter {
+                    Some(f) => {
+                        writeln!(writer, "Displaying games filtered by: {}", f)?;
+                    }
+                    None => {
+                        writeln!(writer, "Displaying all games:")?;
+                    }
+                }
+                for game in games {
+                    let displayable = DisplayableGame { game };
+                    writeln!(writer, "{}", displayable.format(&pattern))?;
+                }
+            }
+            ViewData::None => {}
+        }
+        Ok(())
     }
 }

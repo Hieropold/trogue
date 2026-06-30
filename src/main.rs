@@ -1,13 +1,13 @@
 pub mod app;
 pub mod cfg;
 pub mod constants;
+pub mod plugins;
 pub mod steam_api;
 pub mod ui;
-pub mod plugins;
 
 use cfg::Cfg;
 use clap::Command;
-use std::io::{stdout, stderr};
+use std::io::{stderr, stdout};
 use std::process;
 
 // Loads the application configuration.
@@ -77,12 +77,22 @@ async fn main() {
 
     for plugin in &plugins {
         if let Some(sub_matches) = matches.subcommand_matches(plugin.command().get_name()) {
-            plugin.execute(
-                &app_context,
-                sub_matches,
-                &mut stdout(),
-                &mut stderr(),
-            ).await;
+            match plugin.execute_deep(&app_context, sub_matches).await {
+                Ok(ui::ViewData::None) => {
+                    // Fallback to legacy execute if not implemented
+                    plugin
+                        .execute(&app_context, sub_matches, &mut stdout(), &mut stderr())
+                        .await;
+                }
+                Ok(view_data) => {
+                    if let Err(e) = ui::Renderer::render(view_data, &mut stdout()) {
+                        eprintln!("Error rendering output: {}", e);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{}", e);
+                }
+            }
             return;
         }
     }

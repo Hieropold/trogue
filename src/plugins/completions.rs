@@ -78,7 +78,7 @@ impl Plugin for CompletionsPlugin {
                 Zsh:\n  \
                 trogue completions zsh > ~/.zsh/completions/_trogue\n  \
                 Add 'fpath=(~/.zsh/completions $fpath)' to ~/.zshrc\n  \
-                source ~/.zshrc"
+                source ~/.zshrc",
             )
             .arg(
                 Arg::new("shell")

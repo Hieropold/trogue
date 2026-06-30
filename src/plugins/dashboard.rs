@@ -99,7 +99,14 @@ impl Plugin for DashboardPlugin {
         let padding = (box_width - title.len()) / 2;
 
         writeln!(writer, "{}", "=".repeat(box_width)).unwrap();
-        writeln!(writer, "{}{}{}", " ".repeat(padding), title, " ".repeat(padding)).unwrap();
+        writeln!(
+            writer,
+            "{}{}{}",
+            " ".repeat(padding),
+            title,
+            " ".repeat(padding)
+        )
+        .unwrap();
         writeln!(writer, "{}", "=".repeat(box_width)).unwrap();
 
         for game in recent_games {
@@ -111,7 +118,9 @@ impl Plugin for DashboardPlugin {
                     game_name = name;
                     achievements = achs;
                 }
-                Err(e) => writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap(),
+                Err(e) => {
+                    writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap()
+                }
             }
 
             writeln!(writer, "{}", game_name).unwrap();
@@ -146,7 +155,7 @@ impl Plugin for DashboardPlugin {
 mod tests {
     use super::*;
     use crate::app::AppContext;
-    use crate::steam_api::{Api, Achievement, Game};
+    use crate::steam_api::{Achievement, Api, Game};
     use clap::ArgMatches;
 
     fn create_mock_game(appid: u32, name: &str, rtime_last_played: u64) -> Game {
@@ -194,11 +203,13 @@ mod tests {
 
         for mock in achievements_mocks {
             let url = format!("/ISteamUserStats/GetPlayerAchievements/v0001/?appid={}&key=test_key&steamid=test_id&l=en", mock.appid);
-            server.mock("GET", url.as_str())
+            server
+                .mock("GET", url.as_str())
                 .with_status(mock.status as usize)
                 .with_header("content-type", "application/json")
                 .with_body(&mock.body)
-                .create_async().await;
+                .create_async()
+                .await;
         }
 
         let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
@@ -226,7 +237,8 @@ mod tests {
         ];
         let games_list_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 2, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
 
         let achievements1 = vec![create_mock_achievement(1), create_mock_achievement(0)];
         let achievements_body1 = serde_json::to_string(&serde_json::json!({
@@ -239,16 +251,27 @@ mod tests {
         })).unwrap();
 
         let achievements_mocks = vec![
-            MockGameAchievements { appid: 2, body: achievements_body1, status: 200 },
-            MockGameAchievements { appid: 1, body: achievements_body2, status: 200 },
+            MockGameAchievements {
+                appid: 2,
+                body: achievements_body1,
+                status: 200,
+            },
+            MockGameAchievements {
+                appid: 1,
+                body: achievements_body2,
+                status: 200,
+            },
         ];
 
-        let (app_context, _server) = setup_test_env(&games_list_body, 200, &achievements_mocks).await;
+        let (app_context, _server) =
+            setup_test_env(&games_list_body, 200, &achievements_mocks).await;
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        DashboardPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        DashboardPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Recently Played Games Dashboard"));
@@ -265,7 +288,9 @@ mod tests {
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        DashboardPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        DashboardPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let err_output = String::from_utf8(err_writer).unwrap();
         assert!(err_output.contains("Error while trying to get Steam data"));
@@ -276,18 +301,24 @@ mod tests {
         let games = vec![create_mock_game(1, "Game 1", 100)];
         let games_list_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 1, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
 
-        let achievements_mocks = vec![
-            MockGameAchievements { appid: 1, body: "".to_string(), status: 500 },
-        ];
+        let achievements_mocks = vec![MockGameAchievements {
+            appid: 1,
+            body: "".to_string(),
+            status: 500,
+        }];
 
-        let (app_context, _server) = setup_test_env(&games_list_body, 200, &achievements_mocks).await;
+        let (app_context, _server) =
+            setup_test_env(&games_list_body, 200, &achievements_mocks).await;
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        DashboardPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        DashboardPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let err_output = String::from_utf8(err_writer).unwrap();
         assert!(err_output.contains("Error while trying to get achievements"));
@@ -297,14 +328,17 @@ mod tests {
     async fn test_execute_no_games() {
         let games_list_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 0, "games": [] }
-        })).unwrap();
+        }))
+        .unwrap();
 
         let (app_context, _server) = setup_test_env(&games_list_body, 200, &[]).await;
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        DashboardPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        DashboardPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Recently Played Games Dashboard"));
@@ -316,22 +350,28 @@ mod tests {
         let games = vec![create_mock_game(1, "Game 1", 100)];
         let games_list_body = serde_json::to_string(&serde_json::json!({
             "response": { "game_count": 1, "games": games }
-        })).unwrap();
+        }))
+        .unwrap();
 
         let achievements_body = serde_json::to_string(&serde_json::json!({
             "playerstats": { "steamID": "test_id", "gameName": "Game 1", "achievements": [], "success": true }
         })).unwrap();
 
-        let achievements_mocks = vec![
-            MockGameAchievements { appid: 1, body: achievements_body, status: 200 },
-        ];
+        let achievements_mocks = vec![MockGameAchievements {
+            appid: 1,
+            body: achievements_body,
+            status: 200,
+        }];
 
-        let (app_context, _server) = setup_test_env(&games_list_body, 200, &achievements_mocks).await;
+        let (app_context, _server) =
+            setup_test_env(&games_list_body, 200, &achievements_mocks).await;
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
-        DashboardPlugin.execute(&app_context, &matches, &mut writer, &mut err_writer).await;
+        DashboardPlugin
+            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .await;
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Game 1"));
