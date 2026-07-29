@@ -123,10 +123,16 @@ cargo test
 cargo test -- --nocapture
 ```
 
-Run the tests with coverage.
+Run the tests with coverage:
 ```
-cargo tarpaulin --out Html -- --test-threads=1
+cargo llvm-cov
 ```
+
+For an HTML report:
+```
+cargo llvm-cov --html
+```
+Open `target/llvm-cov/html/index.html` to view it.
 
 # PPA
 ```
