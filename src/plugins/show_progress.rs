@@ -125,7 +125,7 @@ impl Plugin for ShowProgressPlugin {
                 let completed = set.achievements.iter().filter(|a| a.achieved > 0).count();
                 let percentage = (completed as f32 / total as f32) * 100.0;
 
-                let terminal_width = crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
+                let terminal_width = ratatui::crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
                 let bar_width = terminal_width / 2;
 
                 let filled_chars = ((percentage / 100.0) * bar_width as f32).round() as usize;

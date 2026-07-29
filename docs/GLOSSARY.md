@@ -58,3 +58,30 @@ credentials (from `TROGUE_STEAM_API_KEY` / `TROGUE_STEAM_ID`), a reused
 **Fake adapter**
 `FakeSteam` — in-memory test adapter at the same seam, constructed with canned
 games/achievements. No sockets, no JSON.
+
+## Interactive mode (TUI)
+
+**Interactive mode**
+The full-screen terminal UI trogue enters when run with no arguments (or via
+`trogue interactive`). Two screens: the game list and the game detail view.
+Read-only — it reaches Steam only through the **Steam client** seam.
+
+**Game detail view**
+The per-game screen opened with Enter from the game list: one game's completion
+progress bar plus its achievement table. Distinct from **dashboard**, which is
+the existing multi-game recently-played overview.
+
+**Achievement view mode**
+Which subset of a game's achievements the detail view shows: `All`,
+`Remaining` (locked, `achieved == 0`), or `Unlocked` (`achieved > 0`).
+Orthogonal to **achievement sort mode**.
+
+**Achievement sort mode**
+The ordering of the achievement table: by name, by unlock time, or by **global
+achievement percentage**, each with a direction. Orthogonal to **achievement
+view mode**.
+
+**Effect**
+A data value returned by a pure state transition describing work the event loop
+must perform (`FetchAchievements(appid)`, `Quit`, …). Keeps I/O out of the state
+model so transitions are unit-testable without a terminal or a network.

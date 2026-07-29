@@ -7,6 +7,7 @@ The `trogue` application is a command-line interface (CLI) tool designed to inte
 ## Features
 
 - **List Games:** Display a list of all games owned by the user, with an option to filter by name.
+- **Interactive Mode:** Full-screen terminal UI (TUI) to browse games and their achievement progress.
 - **List Achievements:** Show a list of all achievements for a specific game, with options to filter by achieved status and include global achievement percentages.
 - **Show Progress:** Display the achievement progress for a specific game as a progress bar.
 - **Dashboard:** Show a dashboard of the 10 most recently played games and their achievement progress.
@@ -64,9 +65,9 @@ Provides a client for interacting with the Steam API. It handles HTTP requests, 
 
 A utility module that provides functions for displaying formatted output to the user. It can be used by any plugin to ensure a consistent look and feel across the application.
 
-### `tui.rs`
+### `plugins/interactive.rs`
 
-Contains a text-based user interface for selecting a game from a list. This module is currently unused but could be integrated into a plugin in the future.
+Provides a full-screen interactive terminal UI (TUI) powered by `ratatui`. Allows browsing owned games and viewing detailed achievement progress in an interactive table. Entered when running `trogue` with no arguments or explicitly via `trogue interactive`.
 
 ## Shell Completion
 

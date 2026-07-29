@@ -93,7 +93,7 @@ impl Plugin for DashboardPlugin {
         let recent_games: Vec<_> = games.iter().take(10).collect();
 
         // Output title
-        let terminal_width = crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
+        let terminal_width = ratatui::crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
         let box_width = terminal_width / 2;
         let title = "Recently Played Games Dashboard";
         let padding = (box_width - title.len()) / 2;

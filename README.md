@@ -40,6 +40,7 @@ Configuration is done through environment:
 # Usage
 
 Some possible usage examples:
+* `trogue` or `trogue interactive` will open an interactive TUI to browse owned games and achievements
 * `trogue list` will list all games in the library
 * `trogue list -f redemption -p 'i - n'` will list games containing "redemption" in the name, and output game id and game name separated by hyphen
 * `trogue achievements 48700` or `trogue achievements "fallout 4"` will display achievements for a specific game

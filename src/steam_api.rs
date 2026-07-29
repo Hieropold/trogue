@@ -207,10 +207,15 @@ impl HttpSteamClient {
         }
     }
 
+    // Strips the request URL from the error before stringifying it, since the
+    // URL's query string carries `key=<TROGUE_STEAM_API_KEY>` and this
+    // message is printed verbatim by every plugin and by the interactive
+    // TUI's error area.
     fn map_transport_error(e: reqwest::Error) -> SteamError {
+        let status = e.status().map(|s| s.as_u16());
         SteamError::Http {
-            status: e.status().map(|s| s.as_u16()),
-            msg: e.to_string(),
+            status,
+            msg: e.without_url().to_string(),
         }
     }
 }
@@ -479,5 +484,28 @@ mod tests {
         let result = client.global_percentages(1).await;
 
         assert!(result.is_err());
+    }
+
+    // A transport-level failure (no server listening) exercises
+    // `map_transport_error`'s `Display` string, which is what plugins and the
+    // interactive TUI print verbatim. It must never contain the API key,
+    // which the request URL's query string otherwise carries.
+    #[tokio::test]
+    async fn test_transport_error_never_leaks_api_key() {
+        let client = HttpSteamClient::with_base_url(
+            "super_secret_key".to_string(),
+            "test_id".to_string(),
+            "http://127.0.0.1:1".to_string(),
+        );
+
+        let result = client.owned_games().await;
+
+        let err = result.expect_err("connecting to a closed port must fail");
+        let message = err.to_string();
+        assert!(
+            !message.contains("super_secret_key"),
+            "error message leaked the API key: {}",
+            message
+        );
     }
 }

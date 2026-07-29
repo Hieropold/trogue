@@ -25,6 +25,7 @@ use std::io::Write;
 
 pub mod completions;
 pub mod dashboard;
+pub mod interactive;
 pub mod list_achievements;
 pub mod list_games;
 pub mod show_progress;
@@ -99,6 +100,7 @@ pub fn get_plugins() -> Vec<Box<dyn Plugin>> {
         Box::new(list_achievements::ListAchievementsPlugin),
         Box::new(show_progress::ShowProgressPlugin),
         Box::new(completions::CompletionsPlugin),
+        Box::new(interactive::InteractivePlugin),
     ]
 }
 
@@ -129,7 +131,7 @@ mod tests {
         let plugins = get_plugins();
 
         // Expected number of plugins.
-        assert_eq!(plugins.len(), 5);
+        assert_eq!(plugins.len(), 6);
 
         let mut expected_names = vec![
             "list",
@@ -137,6 +139,7 @@ mod tests {
             "achievements",
             "progress",
             "completions",
+            "interactive",
         ];
         expected_names.sort();
 

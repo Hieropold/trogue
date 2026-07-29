@@ -30,8 +30,8 @@ use std::process;
 // <side-effects-end>
 #[tokio::main]
 async fn main() {
-    let steam = match HttpSteamClient::from_env() {
-        Ok(client) => client,
+    let steam: std::sync::Arc<dyn crate::steam_client::SteamClient> = match HttpSteamClient::from_env() {
+        Ok(client) => std::sync::Arc::new(client),
         Err(e) => {
             eprintln!("Error: {}", e);
             process::exit(1);
@@ -50,13 +50,29 @@ async fn main() {
 
     let matches = command.get_matches();
 
+    if matches.subcommand().is_none() {
+        use std::io::IsTerminal;
+        if std::io::stdout().is_terminal() {
+            plugins::interactive::run(steam.clone()).await;
+            return;
+        } else {
+            eprintln!("No subcommand provided. See --help.");
+            process::exit(1);
+        }
+    }
+
+    if let Some(("interactive", _)) = matches.subcommand() {
+        plugins::interactive::run(steam.clone()).await;
+        return;
+    }
+
     for plugin in &plugins {
         if let Some(sub_matches) = matches.subcommand_matches(plugin.command().get_name()) {
-            match plugin.execute_deep(&steam, sub_matches).await {
+            match plugin.execute_deep(&*steam, sub_matches).await {
                 Ok(ui::ViewData::None) => {
                     // Fallback to legacy execute if not implemented
                     plugin
-                        .execute(&steam, sub_matches, &mut stdout(), &mut stderr())
+                        .execute(&*steam, sub_matches, &mut stdout(), &mut stderr())
                         .await;
                 }
                 Ok(view_data) => {

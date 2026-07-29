@@ -55,15 +55,13 @@ Plugin-based architecture. Do **not** put feature logic in core modules.
 
 ```
 src/
-├── main.rs            # Entry point: init App, load plugins, dispatch commands
-├── app.rs             # App struct — shared context (cfg, steam_api) passed to plugins
-├── cfg.rs             # Loads config from environment variables (API key, Steam ID)
+├── main.rs            # Entry point: load plugins, dispatch commands
 ├── steam_api.rs       # HTTP client for Steam API; data structures for responses
+├── steam_client.rs    # Domain interfaces for Steam operations
 ├── ui.rs              # Shared UI utilities for consistent formatted output
-├── tui.rs             # TUI game-selector (currently unused)
-├── constants.rs       # Shared constants
 └── plugins/
     ├── mod.rs             # Plugin trait definition + plugin registry
+    ├── interactive.rs     # TUI interactive mode plugin
     ├── list_games.rs
     ├── list_achievements.rs
     ├── show_progress.rs
@@ -84,7 +82,7 @@ src/
 | `tokio` 1 | Async runtime |
 | `serde` / `serde_json` | JSON serialization |
 | `chrono` | Date/time formatting |
-| `crossterm` | Terminal control |
+| `ratatui` | Terminal UI rendering |
 | `mockito` (dev) | HTTP mocking in tests |
 | `gag` (dev) | Capture stdout/stderr in tests |
 
