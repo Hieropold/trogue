@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `app_context`: The shared application context, providing access to the Steam API client.
+//! - `steam`: The Steam client seam, providing access to owned games and achievement data.
 //! - `_matches`: The command-line arguments parsed by `clap` (unused in this plugin).
 //! <inputs-end>
 //!
@@ -18,7 +18,7 @@
 //! - Makes multiple network requests to the Steam API to fetch game lists and achievement data.
 //! <side-effects-end>
 
-use crate::{app::AppContext, plugins::Plugin};
+use crate::{plugins::Plugin, steam_client::SteamClient};
 use async_trait::async_trait;
 use clap::Command;
 use std::io::Write;
@@ -59,7 +59,7 @@ impl Plugin for DashboardPlugin {
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `app_context`: The shared application context.
+    // - `steam`: The Steam client seam.
     // - `_matches`: The clap argument matches for the `dashboard` subcommand (unused).
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error.
@@ -75,15 +75,15 @@ impl Plugin for DashboardPlugin {
     // <side-effects-end>
     async fn execute(
         &self,
-        app_context: &AppContext,
+        steam: &dyn SteamClient,
         _matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
     ) {
         let mut games = Vec::new();
-        match app_context.api.get_games_list().await {
+        match steam.owned_games().await {
             Ok(resp) => games = resp,
-            Err(e) => writeln!(err_writer, "Error while trying to get Steam data: {}", e).unwrap(),
+            Err(e) => writeln!(err_writer, "{}", e).unwrap(),
         }
 
         // Sort games by last played time (most recent first)
@@ -110,20 +110,16 @@ impl Plugin for DashboardPlugin {
         writeln!(writer, "{}", "=".repeat(box_width)).unwrap();
 
         for game in recent_games {
-            let mut achievements = Vec::new();
-            let mut game_name = String::new();
-
-            match app_context.api.get_game_achievements(game.appid).await {
-                Ok((name, achs)) => {
-                    game_name = name;
-                    achievements = achs;
+            let achievements = match steam.achievements(game.appid).await {
+                Ok(set) => {
+                    writeln!(writer, "{}", set.game_name).unwrap();
+                    set.achievements
                 }
                 Err(e) => {
-                    writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap()
+                    writeln!(err_writer, "{}", e).unwrap();
+                    continue;
                 }
-            }
-
-            writeln!(writer, "{}", game_name).unwrap();
+            };
 
             if achievements.is_empty() {
                 writeln!(writer, "No achievements found for this game").unwrap();
@@ -154,8 +150,8 @@ impl Plugin for DashboardPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::AppContext;
-    use crate::steam_api::{Achievement, Api, Game};
+    use crate::steam_client::fake::FakeSteam;
+    use crate::steam_client::{Achievement, AchievementSet, Game, SteamError};
     use clap::ArgMatches;
 
     fn create_mock_game(appid: u32, name: &str, rtime_last_played: u64) -> Game {
@@ -179,42 +175,8 @@ mod tests {
             description: "Test Description".to_string(),
             achieved,
             unlocktime: 0,
+            global_percent: None,
         }
-    }
-
-    struct MockGameAchievements {
-        appid: u32,
-        body: String,
-        status: u16,
-    }
-
-    async fn setup_test_env(
-        games_list_body: &str,
-        games_list_status: u16,
-        achievements_mocks: &[MockGameAchievements],
-    ) -> (AppContext, mockito::ServerGuard) {
-        let mut server = mockito::Server::new_async().await;
-
-        server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
-            .with_status(games_list_status as usize)
-            .with_header("content-type", "application/json")
-            .with_body(games_list_body)
-            .create_async().await;
-
-        for mock in achievements_mocks {
-            let url = format!("/ISteamUserStats/GetPlayerAchievements/v0001/?appid={}&key=test_key&steamid=test_id&l=en", mock.appid);
-            server
-                .mock("GET", url.as_str())
-                .with_status(mock.status as usize)
-                .with_header("content-type", "application/json")
-                .with_body(&mock.body)
-                .create_async()
-                .await;
-        }
-
-        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
-        let app_context = AppContext { api };
-        (app_context, server)
     }
 
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
@@ -231,46 +193,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success() {
-        let games = vec![
-            create_mock_game(1, "Game 1", 100),
-            create_mock_game(2, "Game 2", 200),
-        ];
-        let games_list_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 2, "games": games }
-        }))
-        .unwrap();
-
-        let achievements1 = vec![create_mock_achievement(1), create_mock_achievement(0)];
-        let achievements_body1 = serde_json::to_string(&serde_json::json!({
-            "playerstats": { "steamID": "test_id", "gameName": "Game 2", "achievements": achievements1, "success": true }
-        })).unwrap();
-
-        let achievements2 = vec![create_mock_achievement(1), create_mock_achievement(1)];
-        let achievements_body2 = serde_json::to_string(&serde_json::json!({
-            "playerstats": { "steamID": "test_id", "gameName": "Game 1", "achievements": achievements2, "success": true }
-        })).unwrap();
-
-        let achievements_mocks = vec![
-            MockGameAchievements {
-                appid: 2,
-                body: achievements_body1,
-                status: 200,
-            },
-            MockGameAchievements {
-                appid: 1,
-                body: achievements_body2,
-                status: 200,
-            },
-        ];
-
-        let (app_context, _server) =
-            setup_test_env(&games_list_body, 200, &achievements_mocks).await;
+        let steam = FakeSteam::new()
+            .with_games(vec![
+                create_mock_game(1, "Game 1", 100),
+                create_mock_game(2, "Game 2", 200),
+            ])
+            .with_achievements(
+                1,
+                AchievementSet {
+                    game_name: "Game 1".to_string(),
+                    achievements: vec![create_mock_achievement(1), create_mock_achievement(1)],
+                },
+            )
+            .with_achievements(
+                2,
+                AchievementSet {
+                    game_name: "Game 2".to_string(),
+                    achievements: vec![create_mock_achievement(1), create_mock_achievement(0)],
+                },
+            );
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         DashboardPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -283,61 +230,47 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_get_games_list_api_error() {
-        let (app_context, _server) = setup_test_env("", 500, &[]).await;
+        let steam = FakeSteam::new().with_games_error(SteamError::Http {
+            status: Some(500),
+            msg: "boom".to_string(),
+        });
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         DashboardPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let err_output = String::from_utf8(err_writer).unwrap();
-        assert!(err_output.contains("Error while trying to get Steam data"));
+        assert!(err_output.contains("Steam API request failed"));
     }
 
     #[tokio::test]
     async fn test_execute_get_game_achievements_api_error() {
-        let games = vec![create_mock_game(1, "Game 1", 100)];
-        let games_list_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 1, "games": games }
-        }))
-        .unwrap();
-
-        let achievements_mocks = vec![MockGameAchievements {
-            appid: 1,
-            body: "".to_string(),
-            status: 500,
-        }];
-
-        let (app_context, _server) =
-            setup_test_env(&games_list_body, 200, &achievements_mocks).await;
+        let steam = FakeSteam::new().with_games(vec![create_mock_game(1, "Game 1", 100)]);
+        // No achievements registered for appid 1 -> FakeSteam returns NoStats.
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         DashboardPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let err_output = String::from_utf8(err_writer).unwrap();
-        assert!(err_output.contains("Error while trying to get achievements"));
+        assert!(err_output.contains("no achievement stats"));
     }
 
     #[tokio::test]
     async fn test_execute_no_games() {
-        let games_list_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 0, "games": [] }
-        }))
-        .unwrap();
-
-        let (app_context, _server) = setup_test_env(&games_list_body, 200, &[]).await;
+        let steam = FakeSteam::new().with_games(vec![]);
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         DashboardPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -347,30 +280,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_game_with_no_achievements() {
-        let games = vec![create_mock_game(1, "Game 1", 100)];
-        let games_list_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 1, "games": games }
-        }))
-        .unwrap();
-
-        let achievements_body = serde_json::to_string(&serde_json::json!({
-            "playerstats": { "steamID": "test_id", "gameName": "Game 1", "achievements": [], "success": true }
-        })).unwrap();
-
-        let achievements_mocks = vec![MockGameAchievements {
-            appid: 1,
-            body: achievements_body,
-            status: 200,
-        }];
-
-        let (app_context, _server) =
-            setup_test_env(&games_list_body, 200, &achievements_mocks).await;
+        let steam = FakeSteam::new()
+            .with_games(vec![create_mock_game(1, "Game 1", 100)])
+            .with_achievements(
+                1,
+                AchievementSet {
+                    game_name: "Game 1".to_string(),
+                    achievements: vec![],
+                },
+            );
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         DashboardPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();

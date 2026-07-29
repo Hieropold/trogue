@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `app_context`: The shared application context, providing access to the Steam API client.
+//! - `steam`: The Steam client seam, providing game resolution and achievement data.
 //! - `matches`: The command-line arguments parsed by `clap`.
 //! <inputs-end>
 //!
@@ -18,7 +18,10 @@
 //! - Makes a network request to the Steam API to fetch achievement data.
 //! <side-effects-end>
 
-use crate::{app::AppContext, plugins::Plugin};
+use crate::{
+    plugins::Plugin,
+    steam_client::{GameMatch, SteamClient},
+};
 use async_trait::async_trait;
 use clap::{Arg, Command};
 use std::io::Write;
@@ -53,7 +56,7 @@ impl Plugin for ShowProgressPlugin {
                     .value_name("game_id")
                     .action(clap::ArgAction::Set)
                     .required(true)
-                    .help("The ID of the game to show progress for"),
+                    .help("The ID of the game or part of game title to show progress for"),
             )
     }
 
@@ -61,12 +64,13 @@ impl Plugin for ShowProgressPlugin {
     //
     // <purpose-start>
     // This method is called by the core application when the `progress` command is invoked.
-    // It fetches the achievement data for a given game and displays a progress bar in the console.
+    // It resolves the game (by id or name), fetches its achievement data, and displays a
+    // progress bar in the console.
     // <purpose-end>
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `app_context`: The shared application context.
+    // - `steam`: The Steam client seam.
     // - `matches`: The clap argument matches for the `progress` subcommand.
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error.
@@ -82,48 +86,63 @@ impl Plugin for ShowProgressPlugin {
     // <side-effects-end>
     async fn execute(
         &self,
-        app_context: &AppContext,
+        steam: &dyn SteamClient,
         matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
     ) {
-        let game_id_str = matches.get_one::<String>("game_id").unwrap();
+        let game_arg = matches.get_one::<String>("game_id").unwrap();
 
-        if let Ok(game_id) = game_id_str.parse::<u32>() {
-            match app_context.api.get_game_achievements(game_id).await {
-                Ok((game_name, achievements)) => {
-                    writeln!(writer, "{}", game_name).unwrap();
-
-                    if achievements.is_empty() {
-                        writeln!(writer, "No achievements found for this game").unwrap();
-                        return;
-                    }
-
-                    let total = achievements.len();
-                    let completed = achievements.iter().filter(|a| a.achieved > 0).count();
-                    let percentage = (completed as f32 / total as f32) * 100.0;
-
-                    let terminal_width = crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
-                    let bar_width = terminal_width / 2;
-
-                    let filled_chars = ((percentage / 100.0) * bar_width as f32).round() as usize;
-                    let empty_chars = bar_width - filled_chars;
-
-                    write!(writer, "[").unwrap();
-                    for _ in 0..filled_chars {
-                        write!(writer, "█").unwrap();
-                    }
-                    for _ in 0..empty_chars {
-                        write!(writer, " ").unwrap();
-                    }
-                    writeln!(writer, "] {:.1}% ({}/{})", percentage, completed, total).unwrap();
-                }
-                Err(e) => {
-                    writeln!(err_writer, "Error while trying to get achievements: {}", e).unwrap()
-                }
+        let game_id = match steam.resolve(game_arg).await {
+            Ok(GameMatch::One(game)) => game.appid,
+            Ok(GameMatch::None) => {
+                writeln!(err_writer, "Game not found: {}", game_arg).unwrap();
+                return;
             }
-        } else {
-            writeln!(err_writer, "Invalid game id: {}", game_id_str).unwrap();
+            Ok(GameMatch::Many(games)) => {
+                writeln!(writer, "Multiple games match '{}':", game_arg).unwrap();
+                for m in games {
+                    writeln!(writer, " - {}", m.name).unwrap();
+                }
+                return;
+            }
+            Err(e) => {
+                writeln!(err_writer, "{}", e).unwrap();
+                return;
+            }
+        };
+
+        match steam.achievements(game_id).await {
+            Ok(set) => {
+                writeln!(writer, "{}", set.game_name).unwrap();
+
+                if set.achievements.is_empty() {
+                    writeln!(writer, "No achievements found for this game").unwrap();
+                    return;
+                }
+
+                let total = set.achievements.len();
+                let completed = set.achievements.iter().filter(|a| a.achieved > 0).count();
+                let percentage = (completed as f32 / total as f32) * 100.0;
+
+                let terminal_width = crossterm::terminal::size().unwrap_or((80, 24)).0 as usize;
+                let bar_width = terminal_width / 2;
+
+                let filled_chars = ((percentage / 100.0) * bar_width as f32).round() as usize;
+                let empty_chars = bar_width - filled_chars;
+
+                write!(writer, "[").unwrap();
+                for _ in 0..filled_chars {
+                    write!(writer, "█").unwrap();
+                }
+                for _ in 0..empty_chars {
+                    write!(writer, " ").unwrap();
+                }
+                writeln!(writer, "] {:.1}% ({}/{})", percentage, completed, total).unwrap();
+            }
+            Err(e) => {
+                writeln!(err_writer, "{}", e).unwrap();
+            }
         }
     }
 }
@@ -131,9 +150,23 @@ impl Plugin for ShowProgressPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::AppContext;
-    use crate::steam_api::{Achievement, Api};
+    use crate::steam_client::fake::FakeSteam;
+    use crate::steam_client::{Achievement, AchievementSet, Game};
     use clap::ArgMatches;
+
+    fn create_mock_game(appid: u32, name: &str) -> Game {
+        Game {
+            appid,
+            name: name.to_string(),
+            playtime_forever: 0,
+            img_icon_url: "".to_string(),
+            playtime_windows_forever: 0,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played: 0,
+            playtime_disconnected: 0,
+        }
+    }
 
     fn create_mock_achievement(achieved: u8) -> Achievement {
         Achievement {
@@ -142,23 +175,8 @@ mod tests {
             description: "Test Description".to_string(),
             achieved,
             unlocktime: 0,
+            global_percent: None,
         }
-    }
-
-    async fn setup_test_env(
-        mock_body: &str,
-        status_code: u16,
-    ) -> (AppContext, mockito::ServerGuard) {
-        let mut server = mockito::Server::new_async().await;
-        server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=123&key=test_key&steamid=test_id&l=en")
-            .with_status(status_code as usize)
-            .with_header("content-type", "application/json")
-            .with_body(mock_body)
-            .create_async().await;
-
-        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
-        let app_context = AppContext { api };
-        (app_context, server)
     }
 
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
@@ -176,23 +194,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success() {
-        let achievements = vec![create_mock_achievement(1), create_mock_achievement(0)];
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "playerstats": {
-                "steamID": "test_id",
-                "gameName": "Test Game",
-                "achievements": achievements,
-                "success": true
-            }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let steam = FakeSteam::new()
+            .with_games(vec![create_mock_game(123, "Test Game")])
+            .with_achievements(
+                123,
+                AchievementSet {
+                    game_name: "Test Game".to_string(),
+                    achievements: vec![create_mock_achievement(1), create_mock_achievement(0)],
+                },
+            );
         let matches = get_matches_for_args(&["progress", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ShowProgressPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -201,23 +217,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_execute_by_name() {
+        let steam = FakeSteam::new()
+            .with_games(vec![create_mock_game(123, "Specific Game Title")])
+            .with_achievements(
+                123,
+                AchievementSet {
+                    game_name: "Specific Game Title".to_string(),
+                    achievements: vec![create_mock_achievement(1)],
+                },
+            );
+        let matches = get_matches_for_args(&["progress", "specific"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        ShowProgressPlugin
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
+            .await;
+
+        let output = String::from_utf8(writer).unwrap();
+        assert!(output.starts_with("Specific Game Title"));
+        assert!(output.contains("100.0% (1/1)"));
+    }
+
+    #[tokio::test]
     async fn test_execute_no_achievements() {
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "playerstats": {
-                "steamID": "test_id",
-                "gameName": "Test Game",
-                "achievements": [],
-                "success": true
-            }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let steam = FakeSteam::new()
+            .with_games(vec![create_mock_game(123, "Test Game")])
+            .with_achievements(
+                123,
+                AchievementSet {
+                    game_name: "Test Game".to_string(),
+                    achievements: vec![],
+                },
+            );
         let matches = get_matches_for_args(&["progress", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ShowProgressPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -227,31 +266,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_api_error() {
-        let (app_context, _server) = setup_test_env("", 500).await;
+        let steam = FakeSteam::new().with_games(vec![create_mock_game(123, "Test Game")]);
+        // No achievements registered -> FakeSteam returns NoStats.
         let matches = get_matches_for_args(&["progress", "123"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ShowProgressPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(err_writer).unwrap();
-        assert!(output.contains("Error while trying to get achievements"));
+        assert!(output.contains("no achievement stats"));
     }
 
     #[tokio::test]
-    async fn test_execute_invalid_game_id() {
-        let (app_context, _server) = setup_test_env("", 200).await;
+    async fn test_execute_game_not_found() {
+        let steam = FakeSteam::new().with_games(vec![]);
         let matches = get_matches_for_args(&["progress", "invalid"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ShowProgressPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(err_writer).unwrap();
-        assert_eq!(output.trim(), "Invalid game id: invalid");
+        assert_eq!(output.trim(), "Game not found: invalid");
     }
 }

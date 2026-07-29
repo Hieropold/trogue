@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
 
-use crate::steam_api::{Achievement, Game};
+use crate::steam_client::{Achievement, Game};
 
 // Prints the application title to the console.
 //
@@ -295,6 +295,7 @@ mod tests {
             description: "Test Description".to_string(),
             achieved,
             unlocktime,
+            global_percent: None,
         }
     }
 

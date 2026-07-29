@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `app_context`: The shared application context (not used by this plugin).
+//! - `steam`: The Steam client seam (not used by this plugin).
 //! - `matches`: The command-line arguments parsed by `clap`, containing the shell type.
 //! <inputs-end>
 //!
@@ -18,7 +18,7 @@
 //! - Writes the completion script to the provided writer (stdout).
 //! <side-effects-end>
 
-use crate::{app::AppContext, plugins::Plugin};
+use crate::{plugins::Plugin, steam_client::SteamClient};
 use async_trait::async_trait;
 use clap::{Arg, Command, ValueEnum};
 use clap_complete::{generate, Shell};
@@ -99,7 +99,7 @@ impl Plugin for CompletionsPlugin {
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `app_context`: The shared application context (unused by this plugin).
+    // - `_steam`: The Steam client seam (unused by this plugin).
     // - `matches`: The clap argument matches for the `completions` subcommand.
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error (unused).
@@ -115,7 +115,7 @@ impl Plugin for CompletionsPlugin {
     // <side-effects-end>
     async fn execute(
         &self,
-        _app_context: &AppContext,
+        _steam: &dyn SteamClient,
         matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         _err_writer: &mut (dyn Write + Send),
@@ -148,8 +148,7 @@ impl Plugin for CompletionsPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::AppContext;
-    use crate::steam_api::Api;
+    use crate::steam_client::fake::FakeSteam;
     use clap::ArgMatches;
 
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
@@ -167,18 +166,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_bash() {
-        let api = Api::new(
-            "test_key".to_string(),
-            "test_id".to_string(),
-            "http://localhost".to_string(),
-        );
-        let app_context = AppContext { api };
+        let steam = FakeSteam::new();
         let matches = get_matches_for_args(&["completions", "bash"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         CompletionsPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -188,18 +182,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_zsh() {
-        let api = Api::new(
-            "test_key".to_string(),
-            "test_id".to_string(),
-            "http://localhost".to_string(),
-        );
-        let app_context = AppContext { api };
+        let steam = FakeSteam::new();
         let matches = get_matches_for_args(&["completions", "zsh"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         CompletionsPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();

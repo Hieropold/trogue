@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `app_context`: The shared application context, providing access to the Steam API client.
+//! - `steam`: The Steam client seam, providing access to the user's owned games.
 //! - `matches`: The command-line arguments parsed by `clap`.
 //! <inputs-end>
 //!
@@ -18,7 +18,7 @@
 //! - Makes a network request to the Steam API to fetch the list of games.
 //! <side-effects-end>
 
-use crate::{app::AppContext, plugins::Plugin, ui};
+use crate::{plugins::Plugin, steam_client::SteamClient, ui};
 use async_trait::async_trait;
 use clap::{Arg, Command};
 use std::io::Write;
@@ -82,7 +82,7 @@ E.g.: -p "i: n""#,
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `app_context`: The shared application context.
+    // - `steam`: The Steam client seam.
     // - `matches`: The clap argument matches for the `list` subcommand.
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error.
@@ -98,7 +98,7 @@ E.g.: -p "i: n""#,
     // <side-effects-end>
     async fn execute(
         &self,
-        app_context: &AppContext,
+        steam: &dyn SteamClient,
         matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
@@ -107,9 +107,9 @@ E.g.: -p "i: n""#,
         let pattern = matches.get_one::<String>("pattern").cloned();
 
         let mut games = Vec::new();
-        match app_context.api.get_games_list().await {
+        match steam.owned_games().await {
             Ok(resp) => games = resp,
-            Err(e) => writeln!(err_writer, "Error while trying to get Steam data: {}", e).unwrap(),
+            Err(e) => writeln!(err_writer, "{}", e).unwrap(),
         }
 
         match filter {
@@ -134,15 +134,15 @@ E.g.: -p "i: n""#,
     // Executes the `list` plugin's logic and returns structured data.
     async fn execute_deep(
         &self,
-        app_context: &AppContext,
+        steam: &dyn SteamClient,
         matches: &clap::ArgMatches,
     ) -> Result<crate::ui::ViewData, String> {
         let filter = matches.get_one::<String>("filter").cloned();
         let pattern = matches.get_one::<String>("pattern").cloned();
 
-        let mut games = match app_context.api.get_games_list().await {
+        let mut games = match steam.owned_games().await {
             Ok(resp) => resp,
-            Err(e) => return Err(format!("Error while trying to get Steam data: {}", e)),
+            Err(e) => return Err(e.to_string()),
         };
 
         if let Some(ref f) = filter {
@@ -158,8 +158,8 @@ E.g.: -p "i: n""#,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::AppContext;
-    use crate::steam_api::{Api, Game};
+    use crate::steam_client::fake::FakeSteam;
+    use crate::steam_client::{Game, SteamError};
     use clap::ArgMatches;
 
     fn create_mock_game(appid: u32, name: &str) -> Game {
@@ -174,22 +174,6 @@ mod tests {
             rtime_last_played: 0,
             playtime_disconnected: 0,
         }
-    }
-
-    async fn setup_test_env(
-        mock_body: &str,
-        status_code: u16,
-    ) -> (AppContext, mockito::ServerGuard) {
-        let mut server = mockito::Server::new_async().await;
-        server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
-            .with_status(status_code as usize)
-            .with_header("content-type", "application/json")
-            .with_body(mock_body)
-            .create_async().await;
-
-        let api = Api::new("test_key".to_string(), "test_id".to_string(), server.url());
-        let app_context = AppContext { api };
-        (app_context, server)
     }
 
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
@@ -208,18 +192,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success_no_filter() {
-        let games = vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")];
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 2, "games": games }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let steam =
+            FakeSteam::new().with_games(vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")]);
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ListGamesPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -230,21 +210,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success_with_filter() {
-        let games = vec![
+        let steam = FakeSteam::new().with_games(vec![
             create_mock_game(1, "Awesome Game"),
             create_mock_game(2, "Another Game"),
-        ];
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 2, "games": games }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        ]);
         let matches = get_matches_for_args(&["list", "--filter", "Awesome"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ListGamesPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -255,18 +230,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success_with_filter_and_pattern() {
-        let games = vec![create_mock_game(1, "Awesome Game")];
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 1, "games": games }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let steam = FakeSteam::new().with_games(vec![create_mock_game(1, "Awesome Game")]);
         let matches = get_matches_for_args(&["list", "--filter", "Awesome", "--pattern", "i - n"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ListGamesPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -276,32 +246,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_api_error() {
-        let (app_context, _server) = setup_test_env("", 500).await;
+        let steam = FakeSteam::new().with_games_error(SteamError::Http {
+            status: Some(500),
+            msg: "boom".to_string(),
+        });
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ListGamesPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(err_writer).unwrap();
-        assert!(output.contains("Error while trying to get Steam data"));
+        assert!(output.contains("Steam API request failed"));
     }
 
     #[tokio::test]
     async fn test_execute_no_games() {
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 0, "games": [] }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let steam = FakeSteam::new().with_games(vec![]);
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
 
         ListGamesPlugin
-            .execute(&app_context, &matches, &mut writer, &mut err_writer)
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
             .await;
 
         let output = String::from_utf8(writer).unwrap();
@@ -311,16 +280,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_deep_success_no_filter() {
-        let games = vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")];
-        let mock_body = serde_json::to_string(&serde_json::json!({
-            "response": { "game_count": 2, "games": games }
-        }))
-        .unwrap();
-        let (app_context, _server) = setup_test_env(&mock_body, 200).await;
+        let steam =
+            FakeSteam::new().with_games(vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")]);
         let matches = get_matches_for_args(&["list"]);
 
         let result = ListGamesPlugin
-            .execute_deep(&app_context, &matches)
+            .execute_deep(&steam, &matches)
             .await
             .unwrap();
 

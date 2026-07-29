@@ -19,7 +19,7 @@
 //! - None
 //! <side-effects-end>
 
-use crate::app::AppContext;
+use crate::steam_client::SteamClient;
 use async_trait::async_trait;
 use std::io::Write;
 
@@ -60,7 +60,7 @@ pub trait Plugin: Send + Sync {
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `app_context`: The shared application context.
+    // - `steam`: The domain-level Steam API seam (HTTP in production, fake in tests).
     // - `matches`: The clap argument matches for the subcommand.
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error.
@@ -75,7 +75,7 @@ pub trait Plugin: Send + Sync {
     // <side-effects-end>
     async fn execute(
         &self,
-        app_context: &AppContext,
+        steam: &dyn SteamClient,
         matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
@@ -85,7 +85,7 @@ pub trait Plugin: Send + Sync {
     // This allows decoupling CLI parsing and terminal rendering from the plugin.
     async fn execute_deep(
         &self,
-        _app_context: &AppContext,
+        _steam: &dyn SteamClient,
         _matches: &clap::ArgMatches,
     ) -> Result<crate::ui::ViewData, String> {
         Ok(crate::ui::ViewData::None)

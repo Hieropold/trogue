@@ -1,49 +1,18 @@
-pub mod app;
-pub mod cfg;
-pub mod constants;
 pub mod plugins;
 pub mod steam_api;
+pub mod steam_client;
 pub mod ui;
 
-use cfg::Cfg;
 use clap::Command;
+use steam_api::HttpSteamClient;
 use std::io::{stderr, stdout};
 use std::process;
-
-// Loads the application configuration.
-//
-// <purpose-start>
-// This function is responsible for loading the application configuration from environment variables.
-// If the configuration cannot be loaded, it prints an error message and exits the process.
-// <purpose-end>
-//
-// <inputs-start>
-// - None.
-// <inputs-end>
-//
-// <outputs-start>
-// - `Cfg`: The loaded application configuration.
-// <outputs-end>
-//
-// <side-effects-start>
-// - **Exits the process**: If the configuration cannot be loaded, the process is terminated with a non-zero exit code.
-// <side-effects-end>
-fn load_cfg() -> Cfg {
-    let mut cfg = Cfg::new();
-
-    if let Err(e) = cfg.load() {
-        eprintln!("Error: {}", e);
-        process::exit(1);
-    }
-
-    cfg
-}
 
 // The main entry point of the application.
 //
 // <purpose-start>
 // This function is the main entry point of the application. It parses the command-line arguments,
-// loads the configuration, and runs the appropriate command.
+// builds the production Steam client from environment variables, and runs the appropriate command.
 // <purpose-end>
 //
 // <inputs-start>
@@ -56,12 +25,18 @@ fn load_cfg() -> Cfg {
 //
 // <side-effects-start>
 // - **Prints to the console**: The output of the commands is printed to the standard output.
-// - **Exits the process**: The process is terminated when the command has finished executing.
+// - **Exits the process**: The process is terminated when the command has finished executing, or
+//   immediately with a non-zero code if required environment variables are missing.
 // <side-effects-end>
 #[tokio::main]
 async fn main() {
-    let cfg = load_cfg();
-    let app_context = app::AppContext::new(cfg);
+    let steam = match HttpSteamClient::from_env() {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            process::exit(1);
+        }
+    };
     let plugins = plugins::get_plugins();
 
     let mut command = Command::new("trogue")
@@ -77,11 +52,11 @@ async fn main() {
 
     for plugin in &plugins {
         if let Some(sub_matches) = matches.subcommand_matches(plugin.command().get_name()) {
-            match plugin.execute_deep(&app_context, sub_matches).await {
+            match plugin.execute_deep(&steam, sub_matches).await {
                 Ok(ui::ViewData::None) => {
                     // Fallback to legacy execute if not implemented
                     plugin
-                        .execute(&app_context, sub_matches, &mut stdout(), &mut stderr())
+                        .execute(&steam, sub_matches, &mut stdout(), &mut stderr())
                         .await;
                 }
                 Ok(view_data) => {
