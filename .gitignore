@@ -13,3 +13,8 @@ trogue
 
 # Vendored dependencies
 /vendor/
+
+# Agentic skills
+.agents/
+.claude/
+.gemini/
