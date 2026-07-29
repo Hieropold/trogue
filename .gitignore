@@ -11,9 +11,6 @@ trogue
 # Quilt patch management
 .pc/
 
-# Vendored dependencies
-/vendor/
-
 # Agentic skills
 .agents/
 .claude/
