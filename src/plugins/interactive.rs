@@ -19,6 +19,7 @@ use std::io::{stdout, Write};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use chrono::{TimeZone, Utc};
+use unicode_width::UnicodeWidthStr;
 
 pub struct InteractivePlugin;
 
@@ -314,22 +315,52 @@ pub fn render(state: &State, frame: &mut Frame) {
     render_footer(state, frame, rects[1]);
 }
 
+/// Builds a single game list line with the game name left-aligned and the date right-aligned.
+///
+/// <purpose-start>
+/// Extracts the line-building logic from render_list so it can be unit-tested independently.
+/// The caller supplies the inner width (total area width minus border characters) to ensure
+/// the date string is not clipped by the border.
+/// </purpose-end>
+///
+/// <inputs-start>
+/// - `game_name`: The display name of the game.
+/// - `date_str`: The formatted date string (e.g. "2026-07-30" or "Never").
+/// - `inner_width`: The usable character width inside the bordered area (area.width - 2).
+/// </inputs-start>
+///
+/// <outputs-start>
+/// - A `Line` containing three spans: game name, padding spaces, and date string.
+/// </outputs-start>
+///
+/// <side-effects-start>
+/// - None.
+/// </side-effects-end>
+pub fn build_game_list_line<'a>(game_name: &str, date_str: &str, inner_width: u16) -> Line<'a> {
+    let name_len = game_name.width() as u16;
+    let date_len = date_str.width() as u16;
+    let padding = inner_width.saturating_sub(name_len + date_len) as usize;
+    Line::from(vec![
+        Span::raw(game_name.to_owned()),
+        Span::raw(" ".repeat(padding)),
+        Span::raw(date_str.to_owned()),
+    ])
+}
+
 fn render_list(state: &State, frame: &mut Frame, area: Rect) {
     let filtered = state.filtered_games();
+    // Subtract 2 for the left and right border characters so the content
+    // fits within the visible inner area and the date is not clipped.
+    let inner_width = area.width.saturating_sub(2);
     let mut items = Vec::new();
 
     for game in &filtered {
-        let name = game.name.clone();
         let date_str = if game.rtime_last_played > 0 {
             Utc.timestamp_opt(game.rtime_last_played as i64, 0).unwrap().format("%Y-%m-%d").to_string()
         } else {
             "Never".to_string()
         };
-        let line = Line::from(vec![
-            Span::raw(name),
-            Span::raw(" ".repeat(area.width.saturating_sub(game.name.len() as u16 + date_str.len() as u16) as usize)),
-            Span::raw(date_str),
-        ]);
+        let line = build_game_list_line(&game.name, &date_str, inner_width);
         items.push(ListItem::new(line));
     }
 
@@ -569,5 +600,60 @@ mod tests {
         let g2 = Game { appid: 2, name: "A".to_string(), playtime_forever: 0, img_icon_url: String::new(), playtime_windows_forever: 0, playtime_mac_forever: 0, playtime_linux_forever: 0, rtime_last_played: 20, playtime_disconnected: 0 };
         let state = State::new(vec![g1, g2]);
         assert_eq!(state.games[0].name, "A"); // 20 > 10
+    }
+
+    /// Verifies that `build_game_list_line` produces a line whose total character
+    /// width matches `inner_width` and includes the complete date string, ensuring
+    /// the date is never clipped by the border.
+    #[test]
+    fn test_build_game_list_line_date_not_truncated() {
+        let game_name = "Cyberpunk 2077";
+        let date_str = "2026-07-30";
+        // Simulate a terminal area.width of 100 => inner_width = 98 (minus 2 for borders)
+        let inner_width: u16 = 98;
+
+        let line = build_game_list_line(game_name, date_str, inner_width);
+        let total_len: usize = line.spans.iter().map(|s| s.content.len()).sum();
+
+        assert_eq!(total_len, inner_width as usize, "Line width must equal inner_width");
+        // The last span must be the complete date string
+        assert_eq!(line.spans.last().unwrap().content, date_str, "Date must not be truncated");
+    }
+
+    /// Verifies padding is zero (no extra spaces) when the game name + date fill
+    /// or exceed the available inner width.
+    #[test]
+    fn test_build_game_list_line_no_padding_when_full() {
+        let game_name = "A Very Long Game Name That Fills The Width Completely";
+        let date_str = "2026-07-30";
+        // Inner width smaller than name + date
+        let inner_width: u16 = 50;
+
+        let line = build_game_list_line(game_name, date_str, inner_width);
+        // Padding span should be empty
+        assert_eq!(line.spans[1].content.as_ref(), "", "Padding must be empty when content overflows");
+        // Date must still be fully present
+        assert_eq!(line.spans.last().unwrap().content, date_str, "Date must not be truncated");
+    }
+
+    /// Verifies that game names containing multi-byte unicode characters (such as trademark symbols ™)
+    /// calculate padding based on display width (terminal columns) rather than byte count.
+    #[test]
+    fn test_build_game_list_line_with_unicode_symbols() {
+        let game_name = "Middle-earth™: Shadow of War™";
+        let date_str = "2024-07-13";
+        let inner_width: u16 = 90;
+
+        let line = build_game_list_line(game_name, date_str, inner_width);
+        
+        let name_display_width = game_name.width();
+        let date_display_width = date_str.width();
+        let padding_spaces = line.spans[1].content.len();
+
+        assert_eq!(
+            name_display_width + padding_spaces + date_display_width,
+            inner_width as usize,
+            "Total visual width (name width + padding + date width) must match inner_width"
+        );
     }
 }
