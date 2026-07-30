@@ -118,7 +118,64 @@ struct GlobalAchievements {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct WireGlobalAchievement {
     name: String,
+    #[serde(deserialize_with = "deserialize_percent")]
     percent: f32,
+}
+
+// Deserializes the `percent` field from either a JSON string or number.
+//
+// <purpose-start>
+// The Steam API `GetGlobalAchievementPercentagesForApp/v0002` returns
+// `percent` as a JSON string (e.g., `"0.4"`) rather than a bare number.
+// serde's default `f32` deserialization rejects strings, causing a silent
+// `Decode` error that leaves every achievement's `global_percent` as `None`.
+// This handles both string and numeric representations for robustness.
+// <purpose-end>
+//
+// <inputs-start>
+// - `deserializer`: A serde `Deserializer` positioned at the `percent` field.
+// <inputs-end>
+//
+// <outputs-start>
+// - `Result<f32, D::Error>`: The parsed floating point percentage value.
+// <outputs-end>
+//
+// <side-effects-start>
+// - None.
+// <side-effects-end>
+fn deserialize_percent<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct PercentVisitor;
+
+    impl<'de> de::Visitor<'de> for PercentVisitor {
+        type Value = f32;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a number or numeric string")
+        }
+
+        fn visit_f64<E: de::Error>(self, v: f64) -> Result<f32, E> {
+            Ok(v as f32)
+        }
+
+        fn visit_u64<E: de::Error>(self, v: u64) -> Result<f32, E> {
+            Ok(v as f32)
+        }
+
+        fn visit_i64<E: de::Error>(self, v: i64) -> Result<f32, E> {
+            Ok(v as f32)
+        }
+
+        fn visit_str<E: de::Error>(self, v: &str) -> Result<f32, E> {
+            v.parse::<f32>().map_err(de::Error::custom)
+        }
+    }
+
+    deserializer.deserialize_any(PercentVisitor)
 }
 
 impl From<WireGlobalAchievement> for GlobalAchievement {
@@ -443,6 +500,35 @@ mod tests {
 
     #[tokio::test]
     async fn test_global_percentages_success() {
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=1&format=json&l=en")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{
+                "achievementpercentages": {
+                    "achievements": [
+                        {
+                            "name": "test_ach",
+                            "percent": "50.5"
+                        }
+                    ]
+                }
+            }"#)
+            .create_async().await;
+
+        let client =
+            HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
+        let achievements = client.global_percentages(1).await.unwrap();
+
+        assert_eq!(achievements.len(), 1);
+        assert_eq!(achievements[0].name, "test_ach");
+        assert_eq!(achievements[0].percent, 50.5);
+    }
+
+    #[tokio::test]
+    async fn test_global_percentages_numeric_format() {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 

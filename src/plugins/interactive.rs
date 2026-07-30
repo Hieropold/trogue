@@ -556,18 +556,10 @@ pub async fn run(steam: Arc<dyn SteamClient>) {
                             let tx = tx.clone();
                             let steam = steam.clone();
                             tokio::spawn(async move {
-                                // For global percentages
-                                let result = async {
-                                    let mut set = steam.achievements(appid).await?;
-                                    if let Ok(globals) = steam.global_percentages(appid).await {
-                                        for a in &mut set.achievements {
-                                            if let Some(g) = globals.iter().find(|x| x.name == a.apiname) {
-                                                a.global_percent = Some(g.percent);
-                                            }
-                                        }
-                                    }
-                                    Ok(set)
-                                }.await;
+                                // Fetches achievements enriched with global unlock
+                                // percentages via the centralized trait method, avoiding
+                                // duplicating the apiname-join logic inline.
+                                let result = steam.achievements_with_global(appid).await;
                                 let _ = tx.send(AppEvent::Achievements { appid, result });
                             });
                         }
