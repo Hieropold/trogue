@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: fmt, clippy, test, coverage, audit
+    runs-on: ubuntu-latest
+    steps:
+      # All third-party actions below are pinned to a commit SHA, not a
+      # version tag: tags are mutable and a compromised maintainer account
+      # or token can repoint one to malicious code without any version bump
+      # ever showing up in this diff (this is exactly how the 2025
+      # tj-actions/changed-files and reviewdog incidents worked). The
+      # trailing `# vX.Y.Z` comment records which release the pinned commit
+      # corresponds to, for human readability only — it is not resolved by
+      # the workflow engine.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Toolchain version and components come from rust-toolchain.toml,
+      # so this stays in sync with local dev and the git hooks automatically.
+      # dtolnay/rust-toolchain has no version tags; pinned to the tip of its
+      # `stable` branch as of 2026-07-31. That branch only updates the
+      # action's own install logic — the Rust version installed is driven
+      # entirely by rust-toolchain.toml, so pinning here does not freeze
+      # the Rust version.
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07-16
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      # -D clippy::all (not -D warnings): the [lints] table in Cargo.toml
+      # also enables advisory ratchet lints (unwrap_used, expect_used,
+      # panic, missing_debug_implementations, unused_qualifications) at
+      # "warn" on purpose. clippy::todo/unimplemented/dbg_macro/mem_forget
+      # are "deny" in the manifest and always fail regardless of flags.
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D clippy::all
+
+      # Pinned to the versioned release, not the floating per-tool tag
+      # (e.g. `@cargo-llvm-cov`) that taiki-e/install-action also publishes
+      # — those tags are deliberately rewritten on every new tool release,
+      # which is the opposite of a pin.
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Test with coverage
+        run: cargo llvm-cov --summary-only --fail-under-lines 69
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        with:
+          tool: cargo-audit
+
+      - name: Audit dependencies
+        run: cargo audit

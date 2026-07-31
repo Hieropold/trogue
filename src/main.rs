@@ -1,12 +1,17 @@
+// Test code legitimately reaches for `unwrap`/`expect`/`panic!` to fail fast
+// on unexpected fixtures; the warn-level lints in Cargo.toml's [lints.clippy]
+// exist to catch those same calls in production code paths, so exempt tests.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
+
 pub mod plugins;
 pub mod steam_api;
 pub mod steam_client;
 pub mod ui;
 
 use clap::Command;
-use steam_api::HttpSteamClient;
 use std::io::{stderr, stdout};
 use std::process;
+use steam_api::HttpSteamClient;
 
 // The main entry point of the application.
 //
@@ -30,7 +35,7 @@ use std::process;
 // <side-effects-end>
 #[tokio::main]
 async fn main() {
-    let steam: std::sync::Arc<dyn crate::steam_client::SteamClient> = match HttpSteamClient::from_env() {
+    let steam: std::sync::Arc<dyn steam_client::SteamClient> = match HttpSteamClient::from_env() {
         Ok(client) => std::sync::Arc::new(client),
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -52,7 +57,7 @@ async fn main() {
 
     if matches.subcommand().is_none() {
         use std::io::IsTerminal;
-        if std::io::stdout().is_terminal() {
+        if stdout().is_terminal() {
             plugins::interactive::run(steam.clone()).await;
             return;
         } else {

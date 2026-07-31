@@ -136,7 +136,7 @@ E.g.: -p "i: n""#,
         &self,
         steam: &dyn SteamClient,
         matches: &clap::ArgMatches,
-    ) -> Result<crate::ui::ViewData, String> {
+    ) -> Result<ui::ViewData, String> {
         let filter = matches.get_one::<String>("filter").cloned();
         let pattern = matches.get_one::<String>("pattern").cloned();
 
@@ -151,7 +151,7 @@ E.g.: -p "i: n""#,
 
         let pattern = pattern.unwrap_or("[i] n".to_string());
 
-        Ok(crate::ui::ViewData::ListGames(games, filter, pattern))
+        Ok(ui::ViewData::ListGames(games, filter, pattern))
     }
 }
 
@@ -192,8 +192,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success_no_filter() {
-        let steam =
-            FakeSteam::new().with_games(vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")]);
+        let steam = FakeSteam::new().with_games(vec![
+            create_mock_game(1, "Game 1"),
+            create_mock_game(2, "Game 2"),
+        ]);
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -280,8 +282,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_deep_success_no_filter() {
-        let steam =
-            FakeSteam::new().with_games(vec![create_mock_game(1, "Game 1"), create_mock_game(2, "Game 2")]);
+        let steam = FakeSteam::new().with_games(vec![
+            create_mock_game(1, "Game 1"),
+            create_mock_game(2, "Game 2"),
+        ]);
         let matches = get_matches_for_args(&["list"]);
 
         let result = ListGamesPlugin
@@ -290,7 +294,7 @@ mod tests {
             .unwrap();
 
         match result {
-            crate::ui::ViewData::ListGames(games, filter, pattern) => {
+            ui::ViewData::ListGames(games, filter, pattern) => {
                 assert_eq!(games.len(), 2);
                 assert_eq!(filter, None);
                 assert_eq!(pattern, "[i] n");

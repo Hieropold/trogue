@@ -1,0 +1,14 @@
+#!/bin/sh
+# Fast local gate: formatting and the hard-failing clippy lint categories.
+#
+# Deliberately scoped to `-D clippy::all` rather than `-D warnings`: the
+# lint policy in Cargo.toml's [lints] also enables advisory ratchet lints
+# (clippy::unwrap_used, clippy::expect_used, clippy::panic,
+# missing_debug_implementations, unused_qualifications) at "warn" on
+# purpose, so they surface without blocking every commit. `clippy::todo`,
+# `clippy::unimplemented`, `clippy::dbg_macro`, and `clippy::mem_forget`
+# are set to "deny" in the manifest, so they always fail regardless of
+# the flags used here.
+set -e
+cargo fmt --check
+cargo clippy --offline --all-targets -- -D clippy::all

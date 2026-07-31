@@ -1,0 +1,11 @@
+#!/bin/sh
+# Slower gate: full test suite plus a coverage floor and an advisory
+# security audit. `cargo llvm-cov` runs the test suite itself, so tests
+# are not executed twice.
+#
+# `cargo audit` needs the network to refresh the advisory database, so it
+# is advisory (not blocking) here; CI runs it with network access and
+# treats it as the authoritative, blocking gate.
+set -e
+cargo llvm-cov --offline --summary-only --fail-under-lines 79
+cargo audit || echo "warning: cargo audit failed (offline?); CI will enforce it"

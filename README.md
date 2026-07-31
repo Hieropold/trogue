@@ -116,6 +116,12 @@ To run linting:
 cargo clippy
 ```
 
+To enable the local git hooks (fmt/clippy/test/coverage/audit gates on commit and push),
+once per clone:
+```
+git config core.hooksPath .githooks
+```
+
 # Test
 
 Run the tests:

@@ -149,10 +149,10 @@ pub trait SteamClient: Send + Sync {
     async fn resolve(&self, query: &str) -> Result<GameMatch, SteamError> {
         let games = self.owned_games().await?;
 
-        if let Ok(appid) = query.parse::<u32>() {
-            if let Some(game) = games.iter().find(|g| g.appid == appid) {
-                return Ok(GameMatch::One(game.clone()));
-            }
+        if let Ok(appid) = query.parse::<u32>()
+            && let Some(game) = games.iter().find(|g| g.appid == appid)
+        {
+            return Ok(GameMatch::One(game.clone()));
         }
 
         let query_lower = query.to_lowercase();
@@ -236,10 +236,7 @@ pub mod fake {
             &self,
             appid: u32,
         ) -> Result<Vec<GlobalAchievement>, SteamError> {
-            self.global
-                .get(&appid)
-                .cloned()
-                .unwrap_or(Ok(Vec::new()))
+            self.global.get(&appid).cloned().unwrap_or(Ok(Vec::new()))
         }
     }
 }
@@ -297,8 +294,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_returns_many_on_ambiguous_name() {
-        let client =
-            FakeSteam::new().with_games(vec![game(1, "Foo One"), game(2, "Foo Two")]);
+        let client = FakeSteam::new().with_games(vec![game(1, "Foo One"), game(2, "Foo Two")]);
 
         let result = client.resolve("foo").await.unwrap();
 
@@ -329,12 +325,10 @@ mod tests {
             )
             .with_global(
                 123,
-                vec![
-                    GlobalAchievement {
-                        name: "ach1".to_string(),
-                        percent: 50.5,
-                    },
-                ],
+                vec![GlobalAchievement {
+                    name: "ach1".to_string(),
+                    percent: 50.5,
+                }],
             );
 
         let set = client.achievements_with_global(123).await.unwrap();
@@ -353,7 +347,13 @@ mod tests {
                     achievements: vec![achievement("ach1", 1)],
                 },
             )
-            .with_global_error(123, SteamError::Http { status: Some(500), msg: "boom".to_string() });
+            .with_global_error(
+                123,
+                SteamError::Http {
+                    status: Some(500),
+                    msg: "boom".to_string(),
+                },
+            );
 
         let set = client.achievements_with_global(123).await.unwrap();
 

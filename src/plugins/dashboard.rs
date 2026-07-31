@@ -87,7 +87,7 @@ impl Plugin for DashboardPlugin {
         }
 
         // Sort games by last played time (most recent first)
-        games.sort_by(|a, b| b.rtime_last_played.cmp(&a.rtime_last_played));
+        games.sort_by_key(|g| std::cmp::Reverse(g.rtime_last_played));
 
         // Take only the 10 most recently played games
         let recent_games: Vec<_> = games.iter().take(10).collect();

@@ -1,7 +1,7 @@
 [package]
 name = "trogue"
 version = "0.2.4"
-edition = "2021"
+edition = "2024"
 description = "A terminal-based client for viewing Steam achievements."
 authors = ["Hieropold <hieropold@gmail.com>"]
 license = "MIT"
@@ -33,3 +33,24 @@ mockito = "1.4.0"
 copyright = "2025 Hieropold"
 license-file = "LICENSE"
 depends = "$auto"
+
+# Deterministic lint policy: the single source of truth for lint levels,
+# applied identically by `cargo clippy`, the git hooks, and CI. See
+# "Safe Rust & Enforcement" in CLAUDE.md for the reasoning behind each entry.
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+# Panic paths: a warn-level ratchet, not a wall. Tests are exempted via
+# `#![cfg_attr(test, allow(...))]` in src/main.rs, since `[lints]` cannot
+# be made cfg(test)-conditional.
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+# Correctness / footguns worth hard-failing everywhere, including tests.
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+mem_forget = "deny"

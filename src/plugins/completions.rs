@@ -21,7 +21,7 @@
 use crate::{plugins::Plugin, steam_client::SteamClient};
 use async_trait::async_trait;
 use clap::{Arg, Command, ValueEnum};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use std::io::Write;
 
 pub struct CompletionsPlugin;

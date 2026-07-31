@@ -428,7 +428,13 @@ mod tests {
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
         let result = client.owned_games().await;
 
-        assert!(matches!(result, Err(SteamError::Http { status: Some(500), .. })));
+        assert!(matches!(
+            result,
+            Err(SteamError::Http {
+                status: Some(500),
+                ..
+            })
+        ));
     }
 
     #[tokio::test]

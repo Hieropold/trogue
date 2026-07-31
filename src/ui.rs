@@ -207,10 +207,10 @@ impl DisplayableAchievement {
         };
 
         // Generate top ┌──────┐
-        card.push_str("┌");
+        card.push('┌');
         let horizontal_line_width = longest_length + 8;
         for _ in 0..horizontal_line_width {
-            card.push_str("─");
+            card.push('─');
         }
         card.push_str("┐\n");
 
@@ -232,9 +232,9 @@ impl DisplayableAchievement {
         ));
 
         // Lower └─────────┘
-        card.push_str("└");
+        card.push('└');
         for _i in 0..horizontal_line_width {
-            card.push_str("─");
+            card.push('─');
         }
         card.push_str("┘\n");
 
@@ -267,6 +267,39 @@ impl DisplayableAchievement {
 
         // Format the NaiveDateTime into a human-readable string
         datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+    }
+}
+
+pub enum ViewData {
+    ListGames(Vec<Game>, Option<String>, String), // games, filter, pattern
+    None,
+}
+
+pub struct Renderer;
+
+impl Renderer {
+    pub fn render(
+        view_data: ViewData,
+        writer: &mut (dyn std::io::Write + Send),
+    ) -> std::io::Result<()> {
+        match view_data {
+            ViewData::ListGames(games, filter, pattern) => {
+                match filter {
+                    Some(f) => {
+                        writeln!(writer, "Displaying games filtered by: {}", f)?;
+                    }
+                    None => {
+                        writeln!(writer, "Displaying all games:")?;
+                    }
+                }
+                for game in games {
+                    let displayable = DisplayableGame { game };
+                    writeln!(writer, "{}", displayable.format(&pattern))?;
+                }
+            }
+            ViewData::None => {}
+        }
+        Ok(())
     }
 }
 
@@ -359,38 +392,5 @@ mod tests {
         let card = displayable_achievement.render_card();
         let expected_card = "┌───────────────────────────┐\n│ Name:            test_api │\n│ Achieved:               N │\n│ Date: 1970-01-01 00:00:00 │\n└───────────────────────────┘\n";
         assert_eq!(card, expected_card);
-    }
-}
-
-pub enum ViewData {
-    ListGames(Vec<Game>, Option<String>, String), // games, filter, pattern
-    None,
-}
-
-pub struct Renderer;
-
-impl Renderer {
-    pub fn render(
-        view_data: ViewData,
-        writer: &mut (dyn std::io::Write + Send),
-    ) -> std::io::Result<()> {
-        match view_data {
-            ViewData::ListGames(games, filter, pattern) => {
-                match filter {
-                    Some(f) => {
-                        writeln!(writer, "Displaying games filtered by: {}", f)?;
-                    }
-                    None => {
-                        writeln!(writer, "Displaying all games:")?;
-                    }
-                }
-                for game in games {
-                    let displayable = DisplayableGame { game };
-                    writeln!(writer, "{}", displayable.format(&pattern))?;
-                }
-            }
-            ViewData::None => {}
-        }
-        Ok(())
     }
 }

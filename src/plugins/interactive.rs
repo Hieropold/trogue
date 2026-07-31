@@ -1,24 +1,26 @@
 use crate::plugins::Plugin;
 use crate::steam_client::{Achievement, AchievementSet, Game, SteamClient, SteamError};
 use async_trait::async_trait;
+use chrono::{TimeZone, Utc};
+use ratatui::crossterm::ExecutableCommand;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use ratatui::crossterm::ExecutableCommand;
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table, TableState, List, ListItem, ListState},
-    Frame, Terminal,
+    widgets::{
+        Block, Borders, Cell, Gauge, List, ListItem, ListState, Paragraph, Row, Table, TableState,
+    },
 };
 use std::collections::HashMap;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use chrono::{TimeZone, Utc};
 use unicode_width::UnicodeWidthStr;
 
 pub struct InteractivePlugin;
@@ -125,30 +127,35 @@ impl State {
             .collect()
     }
 
-    pub fn visible_achievements<'a>(&'a self, appid: u32) -> Option<Vec<&'a Achievement>> {
+    pub fn visible_achievements(&self, appid: u32) -> Option<Vec<&Achievement>> {
         let set = match self.achievements_cache.get(&appid) {
             Some(Ok(s)) => s,
             _ => return None,
         };
 
-        let mut achs: Vec<_> = set.achievements.iter().filter(|a| {
-            match self.view_mode {
+        let mut achs: Vec<_> = set
+            .achievements
+            .iter()
+            .filter(|a| match self.view_mode {
                 AchievementViewMode::All => true,
                 AchievementViewMode::Remaining => a.achieved == 0,
                 AchievementViewMode::Unlocked => a.achieved > 0,
-            }
-        }).collect();
+            })
+            .collect();
 
         achs.sort_by(|a, b| {
             let cmp = match self.sort_mode {
                 AchievementSortMode::Name => a.name.cmp(&b.name),
-                AchievementSortMode::UnlockDate => {
-                    a.unlocktime.cmp(&b.unlocktime).then_with(|| a.name.cmp(&b.name))
-                },
+                AchievementSortMode::UnlockDate => a
+                    .unlocktime
+                    .cmp(&b.unlocktime)
+                    .then_with(|| a.name.cmp(&b.name)),
                 AchievementSortMode::GlobalPercent => {
                     let pa = a.global_percent.unwrap_or(0.0);
                     let pb = b.global_percent.unwrap_or(0.0);
-                    pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.name.cmp(&b.name))
+                    pa.partial_cmp(&pb)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.name.cmp(&b.name))
                 }
             };
             match self.sort_dir {
@@ -227,7 +234,10 @@ impl State {
                     self.selection_idx = 0;
                 }
             }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) && !key.modifiers.contains(KeyModifiers::ALT) => {
+            KeyCode::Char(c)
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
                 self.filter.push(c);
                 self.selection_idx = 0;
             }
@@ -356,7 +366,10 @@ fn render_list(state: &State, frame: &mut Frame, area: Rect) {
 
     for game in &filtered {
         let date_str = if game.rtime_last_played > 0 {
-            Utc.timestamp_opt(game.rtime_last_played as i64, 0).unwrap().format("%Y-%m-%d").to_string()
+            Utc.timestamp_opt(game.rtime_last_played as i64, 0)
+                .unwrap()
+                .format("%Y-%m-%d")
+                .to_string()
         } else {
             "Never".to_string()
         };
@@ -366,12 +379,19 @@ fn render_list(state: &State, frame: &mut Frame, area: Rect) {
 
     if items.is_empty() {
         let msg = format!("No games match '{}'", state.filter);
-        frame.render_widget(Paragraph::new(msg).block(Block::default().borders(Borders::ALL)), area);
+        frame.render_widget(
+            Paragraph::new(msg).block(Block::default().borders(Borders::ALL)),
+            area,
+        );
         return;
     }
 
     let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title(format!(" Owned Games (Filter: {}) ", state.filter)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" Owned Games (Filter: {}) ", state.filter)),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
     let mut list_state = ListState::default();
@@ -382,7 +402,10 @@ fn render_list(state: &State, frame: &mut Frame, area: Rect) {
 
 fn render_detail(state: &State, appid: u32, frame: &mut Frame, area: Rect) {
     if state.loading_achievements {
-        frame.render_widget(Paragraph::new("Loading...").block(Block::default().borders(Borders::ALL)), area);
+        frame.render_widget(
+            Paragraph::new("Loading...").block(Block::default().borders(Borders::ALL)),
+            area,
+        );
         return;
     }
 
@@ -393,8 +416,11 @@ fn render_detail(state: &State, appid: u32, frame: &mut Frame, area: Rect) {
 
     match result {
         Err(SteamError::NoStats { .. }) => {
-            frame.render_widget(Paragraph::new("This game has no achievements").block(Block::default().borders(Borders::ALL)), area);
-            return;
+            frame.render_widget(
+                Paragraph::new("This game has no achievements")
+                    .block(Block::default().borders(Borders::ALL)),
+                area,
+            );
         }
         Err(e) => {
             let msg = e.to_string();
@@ -404,52 +430,87 @@ fn render_detail(state: &State, appid: u32, frame: &mut Frame, area: Rect) {
                     .block(Block::default().borders(Borders::ALL).title("Error")),
                 area,
             );
-            return;
         }
         Ok(set) => {
             let total = set.achievements.len();
             let unlocked = set.achievements.iter().filter(|a| a.achieved > 0).count();
-            let percent = if total > 0 { (unlocked as f64 / total as f64) * 100.0 } else { 0.0 };
+            let percent = if total > 0 {
+                (unlocked as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
 
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(3), // Progress bar
-                    Constraint::Min(0),    // Table
-                    Constraint::Length(3), // Description
-                ].as_ref())
+                .constraints(
+                    [
+                        Constraint::Length(3), // Progress bar
+                        Constraint::Min(0),    // Table
+                        Constraint::Length(3), // Description
+                    ]
+                    .as_ref(),
+                )
                 .split(area);
 
             let gauge = Gauge::default()
-                .block(Block::default().title(set.game_name.clone()).borders(Borders::ALL))
+                .block(
+                    Block::default()
+                        .title(set.game_name.clone())
+                        .borders(Borders::ALL),
+                )
                 .gauge_style(Style::default().fg(Color::Green))
                 .percent(percent as u16)
                 .label(format!("{} / {} ({:.1}%)", unlocked, total, percent));
             frame.render_widget(gauge, chunks[0]);
 
             if let Some(achs) = state.visible_achievements(appid) {
-                let rows: Vec<Row> = achs.iter().map(|a| {
-                    let status = if a.achieved > 0 { "✓" } else { "·" };
-                    let status_style = if a.achieved > 0 { Style::default().fg(Color::Green) } else { Style::default().add_modifier(Modifier::DIM) };
-                    let date_str = if a.achieved > 0 {
-                        Utc.timestamp_opt(a.unlocktime as i64, 0).unwrap().format("%Y-%m-%d").to_string()
-                    } else {
-                        "".to_string()
-                    };
-                    let percent_str = if let Some(p) = a.global_percent { format!("{:.1}%", p) } else { "".to_string() };
-                    
-                    Row::new(vec![
-                        Cell::from(Span::styled(status, status_style)),
-                        Cell::from(a.name.clone()),
-                        Cell::from(date_str),
-                        Cell::from(percent_str),
-                    ])
-                }).collect();
+                let rows: Vec<Row> = achs
+                    .iter()
+                    .map(|a| {
+                        let status = if a.achieved > 0 { "✓" } else { "·" };
+                        let status_style = if a.achieved > 0 {
+                            Style::default().fg(Color::Green)
+                        } else {
+                            Style::default().add_modifier(Modifier::DIM)
+                        };
+                        let date_str = if a.achieved > 0 {
+                            Utc.timestamp_opt(a.unlocktime as i64, 0)
+                                .unwrap()
+                                .format("%Y-%m-%d")
+                                .to_string()
+                        } else {
+                            "".to_string()
+                        };
+                        let percent_str = if let Some(p) = a.global_percent {
+                            format!("{:.1}%", p)
+                        } else {
+                            "".to_string()
+                        };
 
-                let table = Table::new(rows, [Constraint::Length(3), Constraint::Percentage(60), Constraint::Length(12), Constraint::Length(10)])
-                    .header(Row::new(vec!["St", "Name", "Unlocked", "Global %"]).style(Style::default().add_modifier(Modifier::BOLD)))
-                    .block(Block::default().borders(Borders::ALL))
-                    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+                        Row::new(vec![
+                            Cell::from(Span::styled(status, status_style)),
+                            Cell::from(a.name.clone()),
+                            Cell::from(date_str),
+                            Cell::from(percent_str),
+                        ])
+                    })
+                    .collect();
+
+                let table = Table::new(
+                    rows,
+                    [
+                        Constraint::Length(3),
+                        Constraint::Percentage(60),
+                        Constraint::Length(12),
+                        Constraint::Length(10),
+                    ],
+                )
+                .header(
+                    Row::new(vec!["St", "Name", "Unlocked", "Global %"])
+                        .style(Style::default().add_modifier(Modifier::BOLD)),
+                )
+                .block(Block::default().borders(Borders::ALL))
+                .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
                 let mut table_state = TableState::default();
                 table_state.select(Some(state.detail_selection_idx));
@@ -460,7 +521,11 @@ fn render_detail(state: &State, appid: u32, frame: &mut Frame, area: Rect) {
                 } else {
                     String::new()
                 };
-                frame.render_widget(Paragraph::new(desc).block(Block::default().borders(Borders::ALL).title("Description")), chunks[2]);
+                frame.render_widget(
+                    Paragraph::new(desc)
+                        .block(Block::default().borders(Borders::ALL).title("Description")),
+                    chunks[2],
+                );
             }
         }
     }
@@ -468,7 +533,9 @@ fn render_detail(state: &State, appid: u32, frame: &mut Frame, area: Rect) {
 
 fn render_footer(state: &State, frame: &mut Frame, area: Rect) {
     let text = match state.screen {
-        Screen::List => "Type to filter | ↑/↓: Move | Enter: View | Esc: Clear/Quit | Ctrl-C: Quit".to_string(),
+        Screen::List => {
+            "Type to filter | ↑/↓: Move | Enter: View | Esc: Clear/Quit | Ctrl-C: Quit".to_string()
+        }
         Screen::Detail(_) => {
             let view = match state.view_mode {
                 AchievementViewMode::All => "All",
@@ -484,15 +551,24 @@ fn render_footer(state: &State, frame: &mut Frame, area: Rect) {
                 SortDirection::Ascending => "Asc",
                 SortDirection::Descending => "Desc",
             };
-            format!("Esc/q: Back | a/r/u: View({}) | n/d/g: Sort({} {}) | ↑/↓: Scroll", view, sort, dir)
+            format!(
+                "Esc/q: Back | a/r/u: View({}) | n/d/g: Sort({} {}) | ↑/↓: Scroll",
+                view, sort, dir
+            )
         }
     };
-    frame.render_widget(Paragraph::new(text).style(Style::default().add_modifier(Modifier::REVERSED)), area);
+    frame.render_widget(
+        Paragraph::new(text).style(Style::default().add_modifier(Modifier::REVERSED)),
+        area,
+    );
 }
 
 pub enum AppEvent {
     Key(KeyEvent),
-    Achievements { appid: u32, result: Result<AchievementSet, SteamError> },
+    Achievements {
+        appid: u32,
+        result: Result<AchievementSet, SteamError>,
+    },
 }
 
 pub async fn run(steam: Arc<dyn SteamClient>) {
@@ -533,12 +609,11 @@ pub async fn run(steam: Arc<dyn SteamClient>) {
 
     std::thread::spawn(move || {
         loop {
-            if let Ok(Event::Key(key)) = event::read() {
-                if key.kind == event::KeyEventKind::Press {
-                    if tx_key.send(AppEvent::Key(key)).is_err() {
-                        break;
-                    }
-                }
+            if let Ok(Event::Key(key)) = event::read()
+                && key.kind == event::KeyEventKind::Press
+                && tx_key.send(AppEvent::Key(key)).is_err()
+            {
+                break;
             }
         }
     });
@@ -568,10 +643,10 @@ pub async fn run(steam: Arc<dyn SteamClient>) {
                 }
                 AppEvent::Achievements { appid, result } => {
                     state.achievements_cache.insert(appid, result);
-                    if let Screen::Detail(current_appid) = state.screen {
-                        if current_appid == appid {
-                            state.loading_achievements = false;
-                        }
+                    if let Screen::Detail(current_appid) = state.screen
+                        && current_appid == appid
+                    {
+                        state.loading_achievements = false;
                     }
                 }
             }
@@ -588,8 +663,28 @@ mod tests {
 
     #[test]
     fn test_state_new() {
-        let g1 = Game { appid: 1, name: "B".to_string(), playtime_forever: 0, img_icon_url: String::new(), playtime_windows_forever: 0, playtime_mac_forever: 0, playtime_linux_forever: 0, rtime_last_played: 10, playtime_disconnected: 0 };
-        let g2 = Game { appid: 2, name: "A".to_string(), playtime_forever: 0, img_icon_url: String::new(), playtime_windows_forever: 0, playtime_mac_forever: 0, playtime_linux_forever: 0, rtime_last_played: 20, playtime_disconnected: 0 };
+        let g1 = Game {
+            appid: 1,
+            name: "B".to_string(),
+            playtime_forever: 0,
+            img_icon_url: String::new(),
+            playtime_windows_forever: 0,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played: 10,
+            playtime_disconnected: 0,
+        };
+        let g2 = Game {
+            appid: 2,
+            name: "A".to_string(),
+            playtime_forever: 0,
+            img_icon_url: String::new(),
+            playtime_windows_forever: 0,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played: 20,
+            playtime_disconnected: 0,
+        };
         let state = State::new(vec![g1, g2]);
         assert_eq!(state.games[0].name, "A"); // 20 > 10
     }
