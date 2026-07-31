@@ -660,31 +660,62 @@ pub async fn run(steam: Arc<dyn SteamClient>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::backend::TestBackend;
+
+    fn make_game(appid: u32, name: &str, rtime_last_played: u64) -> Game {
+        Game {
+            appid,
+            name: name.to_string(),
+            playtime_forever: 0,
+            img_icon_url: String::new(),
+            playtime_windows_forever: 0,
+            playtime_mac_forever: 0,
+            playtime_linux_forever: 0,
+            rtime_last_played,
+            playtime_disconnected: 0,
+        }
+    }
+
+    fn make_achievement(
+        apiname: &str,
+        name: &str,
+        achieved: u8,
+        unlocktime: u64,
+        global_percent: Option<f32>,
+    ) -> Achievement {
+        Achievement {
+            apiname: apiname.to_string(),
+            achieved,
+            unlocktime,
+            name: name.to_string(),
+            description: format!("{name} description"),
+            global_percent,
+        }
+    }
+
+    fn make_achievement_set() -> AchievementSet {
+        AchievementSet {
+            game_name: "Test Game".to_string(),
+            achievements: vec![
+                make_achievement("a_alpha", "Alpha", 1, 200, Some(10.0)),
+                make_achievement("b_beta", "Beta", 0, 0, None),
+                make_achievement("c_gamma", "Gamma", 1, 100, Some(50.0)),
+            ],
+        }
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn key_with(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+        KeyEvent::new(code, modifiers)
+    }
 
     #[test]
     fn test_state_new() {
-        let g1 = Game {
-            appid: 1,
-            name: "B".to_string(),
-            playtime_forever: 0,
-            img_icon_url: String::new(),
-            playtime_windows_forever: 0,
-            playtime_mac_forever: 0,
-            playtime_linux_forever: 0,
-            rtime_last_played: 10,
-            playtime_disconnected: 0,
-        };
-        let g2 = Game {
-            appid: 2,
-            name: "A".to_string(),
-            playtime_forever: 0,
-            img_icon_url: String::new(),
-            playtime_windows_forever: 0,
-            playtime_mac_forever: 0,
-            playtime_linux_forever: 0,
-            rtime_last_played: 20,
-            playtime_disconnected: 0,
-        };
+        let g1 = make_game(1, "B", 10);
+        let g2 = make_game(2, "A", 20);
         let state = State::new(vec![g1, g2]);
         assert_eq!(state.games[0].name, "A"); // 20 > 10
     }
@@ -702,9 +733,16 @@ mod tests {
         let line = build_game_list_line(game_name, date_str, inner_width);
         let total_len: usize = line.spans.iter().map(|s| s.content.len()).sum();
 
-        assert_eq!(total_len, inner_width as usize, "Line width must equal inner_width");
+        assert_eq!(
+            total_len, inner_width as usize,
+            "Line width must equal inner_width"
+        );
         // The last span must be the complete date string
-        assert_eq!(line.spans.last().unwrap().content, date_str, "Date must not be truncated");
+        assert_eq!(
+            line.spans.last().unwrap().content,
+            date_str,
+            "Date must not be truncated"
+        );
     }
 
     /// Verifies padding is zero (no extra spaces) when the game name + date fill
@@ -718,9 +756,17 @@ mod tests {
 
         let line = build_game_list_line(game_name, date_str, inner_width);
         // Padding span should be empty
-        assert_eq!(line.spans[1].content.as_ref(), "", "Padding must be empty when content overflows");
+        assert_eq!(
+            line.spans[1].content.as_ref(),
+            "",
+            "Padding must be empty when content overflows"
+        );
         // Date must still be fully present
-        assert_eq!(line.spans.last().unwrap().content, date_str, "Date must not be truncated");
+        assert_eq!(
+            line.spans.last().unwrap().content,
+            date_str,
+            "Date must not be truncated"
+        );
     }
 
     /// Verifies that game names containing multi-byte unicode characters (such as trademark symbols ™)
@@ -732,7 +778,7 @@ mod tests {
         let inner_width: u16 = 90;
 
         let line = build_game_list_line(game_name, date_str, inner_width);
-        
+
         let name_display_width = game_name.width();
         let date_display_width = date_str.width();
         let padding_spaces = line.spans[1].content.len();
@@ -742,5 +788,425 @@ mod tests {
             inner_width as usize,
             "Total visual width (name width + padding + date width) must match inner_width"
         );
+    }
+
+    #[test]
+    fn test_state_new_tiebreak_on_name() {
+        let g1 = make_game(1, "Zebra", 10);
+        let g2 = make_game(2, "apple", 10);
+        let state = State::new(vec![g1, g2]);
+        // Equal rtime_last_played falls back to case-insensitive name order.
+        assert_eq!(state.games[0].name, "apple");
+        assert_eq!(state.games[1].name, "Zebra");
+    }
+
+    #[test]
+    fn test_filtered_games() {
+        let state = State::new(vec![
+            make_game(1, "Half-Life", 0),
+            make_game(2, "Portal", 0),
+        ]);
+        assert_eq!(state.filtered_games().len(), 2);
+
+        let mut state = state;
+        state.filter = "life".to_string();
+        let filtered = state.filtered_games();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name, "Half-Life");
+
+        state.filter = "nomatch".to_string();
+        assert!(state.filtered_games().is_empty());
+    }
+
+    #[test]
+    fn test_visible_achievements_none_when_not_cached() {
+        let state = State::new(vec![make_game(1, "Game", 0)]);
+        assert!(state.visible_achievements(1).is_none());
+    }
+
+    #[test]
+    fn test_visible_achievements_none_when_cached_error() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(1, Err(SteamError::PrivateProfile));
+        assert!(state.visible_achievements(1).is_none());
+    }
+
+    #[test]
+    fn test_visible_achievements_view_modes() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+
+        state.view_mode = AchievementViewMode::All;
+        assert_eq!(state.visible_achievements(1).unwrap().len(), 3);
+
+        state.view_mode = AchievementViewMode::Remaining;
+        let remaining = state.visible_achievements(1).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].apiname, "b_beta");
+
+        state.view_mode = AchievementViewMode::Unlocked;
+        let unlocked = state.visible_achievements(1).unwrap();
+        assert_eq!(unlocked.len(), 2);
+    }
+
+    #[test]
+    fn test_visible_achievements_sort_name() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+        state.sort_mode = AchievementSortMode::Name;
+
+        state.sort_dir = SortDirection::Ascending;
+        let asc = state.visible_achievements(1).unwrap();
+        assert_eq!(asc[0].name, "Alpha");
+        assert_eq!(asc[2].name, "Gamma");
+
+        state.sort_dir = SortDirection::Descending;
+        let desc = state.visible_achievements(1).unwrap();
+        assert_eq!(desc[0].name, "Gamma");
+        assert_eq!(desc[2].name, "Alpha");
+    }
+
+    #[test]
+    fn test_visible_achievements_sort_unlock_date() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+        state.sort_mode = AchievementSortMode::UnlockDate;
+        state.sort_dir = SortDirection::Ascending;
+
+        let asc = state.visible_achievements(1).unwrap();
+        // Beta (unlocktime 0) < Gamma (100) < Alpha (200)
+        assert_eq!(asc[0].name, "Beta");
+        assert_eq!(asc[1].name, "Gamma");
+        assert_eq!(asc[2].name, "Alpha");
+    }
+
+    #[test]
+    fn test_visible_achievements_sort_global_percent() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+        state.sort_mode = AchievementSortMode::GlobalPercent;
+        state.sort_dir = SortDirection::Ascending;
+
+        // Beta has no global percent -> treated as 0.0, sorts first ascending.
+        let asc = state.visible_achievements(1).unwrap();
+        assert_eq!(asc[0].name, "Beta");
+        assert_eq!(asc[1].name, "Alpha");
+        assert_eq!(asc[2].name, "Gamma");
+    }
+
+    #[test]
+    fn test_clamp_detail_selection() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+
+        state.detail_selection_idx = 1;
+        state.clamp_detail_selection(1);
+        assert_eq!(state.detail_selection_idx, 1); // within bounds, unchanged
+
+        state.detail_selection_idx = 99;
+        state.clamp_detail_selection(1);
+        assert_eq!(state.detail_selection_idx, 2); // clamped to max_idx (3 items)
+    }
+
+    #[test]
+    fn test_handle_list_key_ctrl_c_quits() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        let effect = state.handle_key(key_with(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        assert_eq!(effect, Effect::Quit);
+    }
+
+    #[test]
+    fn test_handle_list_key_esc_clears_filter_then_quits() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state.filter = "abc".to_string();
+        state.selection_idx = 2;
+
+        let effect = state.handle_key(key(KeyCode::Esc));
+        assert_eq!(effect, Effect::None);
+        assert_eq!(state.filter, "");
+        assert_eq!(state.selection_idx, 0);
+
+        let effect = state.handle_key(key(KeyCode::Esc));
+        assert_eq!(effect, Effect::Quit);
+    }
+
+    #[test]
+    fn test_handle_list_key_enter_cache_miss_fetches() {
+        let mut state = State::new(vec![make_game(42, "Game", 0)]);
+        let effect = state.handle_key(key(KeyCode::Enter));
+        assert_eq!(effect, Effect::FetchAchievements(42));
+        assert_eq!(state.screen, Screen::Detail(42));
+        assert!(state.loading_achievements);
+    }
+
+    #[test]
+    fn test_handle_list_key_enter_cache_hit_no_fetch() {
+        let mut state = State::new(vec![make_game(42, "Game", 0)]);
+        state
+            .achievements_cache
+            .insert(42, Ok(make_achievement_set()));
+
+        let effect = state.handle_key(key(KeyCode::Enter));
+        assert_eq!(effect, Effect::None);
+        assert_eq!(state.screen, Screen::Detail(42));
+        assert!(!state.loading_achievements);
+    }
+
+    #[test]
+    fn test_handle_list_key_enter_no_games_is_noop() {
+        let mut state = State::new(vec![]);
+        let effect = state.handle_key(key(KeyCode::Enter));
+        assert_eq!(effect, Effect::None);
+        assert_eq!(state.screen, Screen::List);
+    }
+
+    #[test]
+    fn test_handle_list_key_navigation() {
+        let mut state = State::new(vec![
+            make_game(1, "A", 0),
+            make_game(2, "B", 0),
+            make_game(3, "C", 0),
+        ]);
+
+        state.handle_key(key(KeyCode::Up));
+        assert_eq!(state.selection_idx, 0); // saturating, stays at 0
+
+        state.handle_key(key(KeyCode::Down));
+        assert_eq!(state.selection_idx, 1);
+
+        state.handle_key(key(KeyCode::PageDown));
+        assert_eq!(state.selection_idx, 2); // clamped to max_idx
+
+        state.handle_key(key(KeyCode::PageUp));
+        assert_eq!(state.selection_idx, 0); // saturating_sub(10)
+    }
+
+    #[test]
+    fn test_handle_list_key_backspace_and_char() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state.selection_idx = 5;
+
+        state.handle_key(key(KeyCode::Char('g')));
+        assert_eq!(state.filter, "g");
+        assert_eq!(state.selection_idx, 0);
+
+        state.selection_idx = 3;
+        state.handle_key(key(KeyCode::Backspace));
+        assert_eq!(state.filter, "");
+        assert_eq!(state.selection_idx, 0);
+    }
+
+    #[test]
+    fn test_handle_list_key_ignores_modified_chars() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state.handle_key(key_with(KeyCode::Char('x'), KeyModifiers::ALT));
+        assert_eq!(state.filter, "");
+    }
+
+    #[test]
+    fn test_handle_detail_key_ctrl_c_quits() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state.screen = Screen::Detail(1);
+        let effect = state.handle_key(key_with(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        assert_eq!(effect, Effect::Quit);
+    }
+
+    #[test]
+    fn test_handle_detail_key_back_to_list() {
+        for code in [KeyCode::Esc, KeyCode::Char('q'), KeyCode::Backspace] {
+            let mut state = State::new(vec![make_game(1, "Game", 0)]);
+            state.screen = Screen::Detail(1);
+            state.handle_key(key(code));
+            assert_eq!(state.screen, Screen::List);
+        }
+    }
+
+    #[test]
+    fn test_handle_detail_key_view_modes() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state.screen = Screen::Detail(1);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+
+        state.handle_key(key(KeyCode::Char('r')));
+        assert_eq!(state.view_mode, AchievementViewMode::Remaining);
+
+        state.handle_key(key(KeyCode::Char('u')));
+        assert_eq!(state.view_mode, AchievementViewMode::Unlocked);
+
+        state.handle_key(key(KeyCode::Char('a')));
+        assert_eq!(state.view_mode, AchievementViewMode::All);
+    }
+
+    #[test]
+    fn test_handle_detail_key_sort_modes_set_then_toggle() {
+        for (code, mode, first_dir) in [
+            (
+                KeyCode::Char('n'),
+                AchievementSortMode::Name,
+                SortDirection::Ascending,
+            ),
+            (
+                KeyCode::Char('d'),
+                AchievementSortMode::UnlockDate,
+                SortDirection::Descending,
+            ),
+            (
+                KeyCode::Char('g'),
+                AchievementSortMode::GlobalPercent,
+                SortDirection::Descending,
+            ),
+        ] {
+            let mut state = State::new(vec![make_game(1, "Game", 0)]);
+            state.screen = Screen::Detail(1);
+            // State::new defaults sort_mode to Name; start from a different
+            // mode so the first press always exercises the "set" branch.
+            state.sort_mode = if mode == AchievementSortMode::UnlockDate {
+                AchievementSortMode::Name
+            } else {
+                AchievementSortMode::UnlockDate
+            };
+            state.sort_dir = SortDirection::Ascending;
+
+            state.handle_key(key(code));
+            assert_eq!(state.sort_mode, mode);
+            assert_eq!(state.sort_dir, first_dir);
+
+            // Second press on the same mode toggles direction instead of resetting it.
+            state.handle_key(key(code));
+            assert_eq!(state.sort_mode, mode);
+            assert_ne!(state.sort_dir, first_dir);
+        }
+    }
+
+    #[test]
+    fn test_handle_detail_key_navigation() {
+        let mut state = State::new(vec![make_game(1, "Game", 0)]);
+        state.screen = Screen::Detail(1);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+
+        state.handle_key(key(KeyCode::Down));
+        assert_eq!(state.detail_selection_idx, 1);
+
+        state.handle_key(key(KeyCode::Up));
+        assert_eq!(state.detail_selection_idx, 0);
+
+        state.handle_key(key(KeyCode::PageDown));
+        assert_eq!(state.detail_selection_idx, 2); // clamped to 3 achievements
+
+        state.handle_key(key(KeyCode::PageUp));
+        assert_eq!(state.detail_selection_idx, 0);
+    }
+
+    #[test]
+    fn test_render_list_normal() {
+        let state = State::new(vec![make_game(1, "Portal", 0)]);
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        terminal.draw(|f| render(&state, f)).unwrap();
+        let content = terminal.backend().to_string();
+        assert!(content.contains("Portal"));
+        assert!(content.contains("Type to filter"));
+    }
+
+    #[test]
+    fn test_render_list_no_matches() {
+        let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+        state.filter = "zzz".to_string();
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        terminal.draw(|f| render(&state, f)).unwrap();
+        let content = terminal.backend().to_string();
+        assert!(content.contains("No games match"));
+    }
+
+    #[test]
+    fn test_render_detail_loading() {
+        let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+        state.screen = Screen::Detail(1);
+        state.loading_achievements = true;
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        terminal.draw(|f| render(&state, f)).unwrap();
+        let content = terminal.backend().to_string();
+        assert!(content.contains("Loading"));
+    }
+
+    #[test]
+    fn test_render_detail_cache_miss_renders_nothing_extra() {
+        let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+        state.screen = Screen::Detail(1);
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        // Should not panic even though nothing is cached for appid 1.
+        terminal.draw(|f| render(&state, f)).unwrap();
+    }
+
+    #[test]
+    fn test_render_detail_no_stats() {
+        let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+        state.screen = Screen::Detail(1);
+        state
+            .achievements_cache
+            .insert(1, Err(SteamError::NoStats { appid: 1 }));
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        terminal.draw(|f| render(&state, f)).unwrap();
+        let content = terminal.backend().to_string();
+        assert!(content.contains("no achievements"));
+    }
+
+    #[test]
+    fn test_render_detail_generic_error() {
+        let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+        state.screen = Screen::Detail(1);
+        state
+            .achievements_cache
+            .insert(1, Err(SteamError::PrivateProfile));
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        terminal.draw(|f| render(&state, f)).unwrap();
+        let content = terminal.backend().to_string();
+        assert!(content.contains("private"));
+    }
+
+    #[test]
+    fn test_render_detail_ok_set() {
+        let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+        state.screen = Screen::Detail(1);
+        state
+            .achievements_cache
+            .insert(1, Ok(make_achievement_set()));
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+        terminal.draw(|f| render(&state, f)).unwrap();
+        let content = terminal.backend().to_string();
+        assert!(content.contains("Alpha"));
+        assert!(content.contains("Test Game"));
+    }
+
+    #[test]
+    fn test_render_footer_labels_per_sort_mode() {
+        for (mode, sort_label) in [
+            (AchievementSortMode::Name, "Name"),
+            (AchievementSortMode::UnlockDate, "Date"),
+            (AchievementSortMode::GlobalPercent, "Global%"),
+        ] {
+            let mut state = State::new(vec![make_game(1, "Portal", 0)]);
+            state.screen = Screen::Detail(1);
+            state.sort_mode = mode;
+            let mut terminal = Terminal::new(TestBackend::new(80, 10)).unwrap();
+            terminal.draw(|f| render(&state, f)).unwrap();
+            let content = terminal.backend().to_string();
+            assert!(content.contains(sort_label));
+        }
     }
 }

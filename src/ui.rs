@@ -393,4 +393,50 @@ mod tests {
         let expected_card = "┌───────────────────────────┐\n│ Name:            test_api │\n│ Achieved:               N │\n│ Date: 1970-01-01 00:00:00 │\n└───────────────────────────┘\n";
         assert_eq!(card, expected_card);
     }
+
+    #[test]
+    fn test_renderer_render_list_games_with_filter() {
+        let mut buf = Vec::new();
+        let view_data = ViewData::ListGames(
+            vec![create_mock_game()],
+            Some("test".to_string()),
+            "n (i)".to_string(),
+        );
+        Renderer::render(view_data, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert!(output.contains("Displaying games filtered by: test"));
+        assert!(output.contains("Test Game (123)"));
+    }
+
+    #[test]
+    fn test_renderer_render_list_games_without_filter() {
+        let mut buf = Vec::new();
+        let view_data = ViewData::ListGames(vec![create_mock_game()], None, "n (i)".to_string());
+        Renderer::render(view_data, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert!(output.contains("Displaying all games:"));
+        assert!(output.contains("Test Game (123)"));
+    }
+
+    #[test]
+    fn test_renderer_render_none() {
+        let mut buf = Vec::new();
+        Renderer::render(ViewData::None, &mut buf).unwrap();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn test_print_title_does_not_panic() {
+        print_title();
+    }
+
+    #[test]
+    fn test_print_game_title_does_not_panic() {
+        print_game_title(&create_mock_game());
+    }
+
+    #[test]
+    fn test_print_game_id_does_not_panic() {
+        print_game_id(&create_mock_game());
+    }
 }

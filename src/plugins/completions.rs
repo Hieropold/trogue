@@ -196,38 +196,35 @@ mod tests {
         assert!(output.contains("#compdef") || output.contains("_trogue"));
     }
 
-    #[test]
-    fn test_shell_type_conversion() {
-        let bash: Shell = match ShellType::Bash {
-            ShellType::Bash => Shell::Bash,
-            ShellType::Zsh => Shell::Zsh,
-            ShellType::Fish => Shell::Fish,
-            ShellType::PowerShell => Shell::PowerShell,
-        };
-        assert!(matches!(bash, Shell::Bash));
+    #[tokio::test]
+    async fn test_execute_fish() {
+        let steam = FakeSteam::new();
+        let matches = get_matches_for_args(&["completions", "fish"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
 
-        let zsh: Shell = match ShellType::Zsh {
-            ShellType::Bash => Shell::Bash,
-            ShellType::Zsh => Shell::Zsh,
-            ShellType::Fish => Shell::Fish,
-            ShellType::PowerShell => Shell::PowerShell,
-        };
-        assert!(matches!(zsh, Shell::Zsh));
+        CompletionsPlugin
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
+            .await;
 
-        let fish: Shell = match ShellType::Fish {
-            ShellType::Bash => Shell::Bash,
-            ShellType::Zsh => Shell::Zsh,
-            ShellType::Fish => Shell::Fish,
-            ShellType::PowerShell => Shell::PowerShell,
-        };
-        assert!(matches!(fish, Shell::Fish));
+        let output = String::from_utf8(writer).unwrap();
+        // Verify that the output contains fish completion script markers
+        assert!(output.contains("complete") || output.contains("_trogue"));
+    }
 
-        let powershell: Shell = match ShellType::PowerShell {
-            ShellType::Bash => Shell::Bash,
-            ShellType::Zsh => Shell::Zsh,
-            ShellType::Fish => Shell::Fish,
-            ShellType::PowerShell => Shell::PowerShell,
-        };
-        assert!(matches!(powershell, Shell::PowerShell));
+    #[tokio::test]
+    async fn test_execute_powershell() {
+        let steam = FakeSteam::new();
+        let matches = get_matches_for_args(&["completions", "power-shell"]);
+        let mut writer = Vec::new();
+        let mut err_writer = Vec::new();
+
+        CompletionsPlugin
+            .execute(&steam, &matches, &mut writer, &mut err_writer)
+            .await;
+
+        let output = String::from_utf8(writer).unwrap();
+        // Verify that the output contains PowerShell completion script markers
+        assert!(output.contains("trogue") || output.contains("Register-ArgumentCompleter"));
     }
 }

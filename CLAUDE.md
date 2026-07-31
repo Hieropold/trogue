@@ -73,7 +73,7 @@ no flags to remember. It splits lints into two tiers:
 `cargo clippy --all-targets -- -D clippy::all` — deliberately `clippy::all`, not
 `-D warnings`, so the warn-tier ratchet lints above stay advisory locally while the
 default clippy correctness/style/complexity/perf categories still hard-fail.
-`.githooks/pre-push` runs `cargo llvm-cov --fail-under-lines 69` (a coverage floor,
+`.githooks/pre-push` runs `cargo llvm-cov --fail-under-lines 79` (a coverage floor,
 raised as coverage improves) and an advisory `cargo audit`. Enable the hooks once per
 clone:
 
@@ -171,7 +171,7 @@ make the file changes and stop — tell the user what's ready, and let them run 
 - All changes must go through pull requests with at least one approval.
 - Before submitting changes, run: `cargo fmt --check`,
   `cargo clippy --all-targets -- -D clippy::all`, `cargo test`, and
-  `cargo llvm-cov --fail-under-lines 69`. See "Safe Rust & Enforcement" above.
+  `cargo llvm-cov --fail-under-lines 79`. See "Safe Rust & Enforcement" above.
 - Enable the local git hooks once per clone with
   `git config core.hooksPath .githooks`, and do not skip them (`--no-verify`) or bypass
   commit signing. CI (`.github/workflows/ci.yml`) re-runs the same checks as the
