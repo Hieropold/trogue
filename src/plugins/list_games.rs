@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `steam`: The Steam client seam, providing access to the user's owned games.
+//! - `steam`: The `GameLibrary` seam, providing access to the user's owned games.
 //! - `matches`: The command-line arguments parsed by `clap`.
 //! <inputs-end>
 //!
@@ -15,10 +15,11 @@
 //! <outputs-end>
 //!
 //! <side-effects-start>
-//! - Makes a network request to the Steam API to fetch the list of games.
+//! - Makes network requests to platform APIs to fetch the list of games.
 //! <side-effects-end>
 
-use crate::{plugins::Plugin, steam_client::SteamClient, ui};
+use crate::game_library::GameLibrary;
+use crate::{plugins::Plugin, ui};
 use async_trait::async_trait;
 use clap::{Arg, Command};
 use std::io::Write;
@@ -66,6 +67,7 @@ impl Plugin for ListGamesPlugin {
 Possible tokens are:
     n - game name
     i - game id
+    p - platform
 E.g.: -p "i: n""#,
                     )
                     .requires("filter")
@@ -82,7 +84,7 @@ E.g.: -p "i: n""#,
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `steam`: The Steam client seam.
+    // - `steam`: The `GameLibrary` seam.
     // - `matches`: The clap argument matches for the `list` subcommand.
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error.
@@ -93,12 +95,12 @@ E.g.: -p "i: n""#,
     // <outputs-end>
     //
     // <side-effects-start>
-    // - Makes a network request to the Steam API to fetch the list of games.
+    // - Makes network requests to platform APIs to fetch the list of games.
     // - Writes the list of games to the provided writer.
     // <side-effects-end>
     async fn execute(
         &self,
-        steam: &dyn SteamClient,
+        steam: &dyn GameLibrary,
         matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
@@ -134,7 +136,7 @@ E.g.: -p "i: n""#,
     // Executes the `list` plugin's logic and returns structured data.
     async fn execute_deep(
         &self,
-        steam: &dyn SteamClient,
+        steam: &dyn GameLibrary,
         matches: &clap::ArgMatches,
     ) -> Result<ui::ViewData, String> {
         let filter = matches.get_one::<String>("filter").cloned();
@@ -158,21 +160,18 @@ E.g.: -p "i: n""#,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::steam_client::fake::FakeSteam;
-    use crate::steam_client::{Game, SteamError};
+    use crate::game_library::fake::FakeLibrary;
+    use crate::game_library::{Game, GameId, Platform, PlatformError};
     use clap::ArgMatches;
 
     fn create_mock_game(appid: u32, name: &str) -> Game {
         Game {
-            appid,
+            id: GameId::Steam(appid),
+            platform: Platform::Steam,
             name: name.to_string(),
-            playtime_forever: 0,
-            img_icon_url: "".to_string(),
-            playtime_windows_forever: 0,
-            playtime_mac_forever: 0,
-            playtime_linux_forever: 0,
+            playtime_forever: Some(0),
+            img_icon_url: None,
             rtime_last_played: 0,
-            playtime_disconnected: 0,
         }
     }
 
@@ -192,7 +191,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success_no_filter() {
-        let steam = FakeSteam::new().with_games(vec![
+        let steam = FakeLibrary::new().with_games(vec![
             create_mock_game(1, "Game 1"),
             create_mock_game(2, "Game 2"),
         ]);
@@ -206,13 +205,13 @@ mod tests {
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying all games:"));
-        assert!(output.contains("[1] Game 1"));
-        assert!(output.contains("[2] Game 2"));
+        assert!(output.contains("[steam:1] Game 1"));
+        assert!(output.contains("[steam:2] Game 2"));
     }
 
     #[tokio::test]
     async fn test_execute_success_with_filter() {
-        let steam = FakeSteam::new().with_games(vec![
+        let steam = FakeLibrary::new().with_games(vec![
             create_mock_game(1, "Awesome Game"),
             create_mock_game(2, "Another Game"),
         ]);
@@ -226,13 +225,13 @@ mod tests {
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying games filtered by: Awesome"));
-        assert!(output.contains("[1] Awesome Game"));
-        assert!(!output.contains("[2] Another Game"));
+        assert!(output.contains("[steam:1] Awesome Game"));
+        assert!(!output.contains("[steam:2] Another Game"));
     }
 
     #[tokio::test]
     async fn test_execute_success_with_filter_and_pattern() {
-        let steam = FakeSteam::new().with_games(vec![create_mock_game(1, "Awesome Game")]);
+        let steam = FakeLibrary::new().with_games(vec![create_mock_game(1, "Awesome Game")]);
         let matches = get_matches_for_args(&["list", "--filter", "Awesome", "--pattern", "i - n"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -243,12 +242,12 @@ mod tests {
 
         let output = String::from_utf8(writer).unwrap();
         assert!(output.contains("Displaying games filtered by: Awesome"));
-        assert!(output.contains("1 - Awesome Game"));
+        assert!(output.contains("steam:1 - Awesome Game"));
     }
 
     #[tokio::test]
     async fn test_execute_api_error() {
-        let steam = FakeSteam::new().with_games_error(SteamError::Http {
+        let steam = FakeLibrary::new().with_games_error(PlatformError::Http {
             status: Some(500),
             msg: "boom".to_string(),
         });
@@ -261,12 +260,12 @@ mod tests {
             .await;
 
         let output = String::from_utf8(err_writer).unwrap();
-        assert!(output.contains("Steam API request failed"));
+        assert!(output.contains("API request failed"));
     }
 
     #[tokio::test]
     async fn test_execute_no_games() {
-        let steam = FakeSteam::new().with_games(vec![]);
+        let steam = FakeLibrary::new().with_games(vec![]);
         let matches = get_matches_for_args(&["list"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -282,7 +281,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_deep_success_no_filter() {
-        let steam = FakeSteam::new().with_games(vec![
+        let steam = FakeLibrary::new().with_games(vec![
             create_mock_game(1, "Game 1"),
             create_mock_game(2, "Game 2"),
         ]);

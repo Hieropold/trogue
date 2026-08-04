@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
 
-use crate::steam_client::{Achievement, Game};
+use crate::game_library::{Achievement, Game, GameId, Platform, TrophyGrade};
 
 // Prints the application title to the console.
 //
@@ -84,7 +84,7 @@ pub fn print_game_title(game: &Game) {
 // - **Prints to the console**: The game ID is printed to the standard output.
 // <side-effects-end>
 pub fn print_game_id(game: &Game) {
-    println!("{}", game.appid);
+    println!("{}", game.id);
 }
 
 // A wrapper around the `Game` struct to provide display formatting.
@@ -117,7 +117,8 @@ impl DisplayableGame {
         for ch in pattern.chars() {
             match ch {
                 'n' => result.push_str(&self.game.name),
-                'i' => result.push_str(&self.game.appid.to_string()),
+                'i' => result.push_str(&self.game.id.to_string()),
+                'p' => result.push_str(&self.game.platform.to_string()),
                 _ => result.push(ch),
             }
         }
@@ -164,6 +165,12 @@ impl DisplayableAchievement {
                     "N"
                 }),
                 't' => result.push_str(&self.formatted_unlocktime()),
+                'g' => result.push_str(
+                    &self
+                        .achievement
+                        .grade
+                        .map_or(String::new(), |g| g.to_string()),
+                ),
                 _ => result.push(ch),
             }
         }
@@ -244,7 +251,7 @@ impl DisplayableAchievement {
     // Formats the unlock time into a human-readable string.
     //
     // <purpose-start>
-    // This function converts the Unix timestamp of the achievement's unlock time into a formatted string.
+    // This function converts the Unix timestamp of the achievement's unlock time into a formatted string safely.
     // <purpose-end>
     //
     // <inputs-start>
@@ -259,13 +266,12 @@ impl DisplayableAchievement {
     // - None.
     // <side-effects-end>
     fn formatted_unlocktime(&self) -> String {
-        let ts = self.achievement.unlocktime.try_into().unwrap();
+        let ts: i64 = self.achievement.unlocktime.try_into().unwrap_or(0);
         let datetime = Utc
             .timestamp_opt(ts, 0)
             .single()
-            .expect("Invalid Unix timestamp");
+            .unwrap_or_else(|| Utc.timestamp_opt(0, 0).unwrap());
 
-        // Format the NaiveDateTime into a human-readable string
         datetime.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }
@@ -309,15 +315,12 @@ mod tests {
 
     fn create_mock_game() -> Game {
         Game {
-            appid: 123,
+            id: GameId::Steam(123),
+            platform: Platform::Steam,
             name: "Test Game".to_string(),
-            playtime_forever: 100,
-            img_icon_url: "icon_url".to_string(),
-            playtime_windows_forever: 100,
-            playtime_mac_forever: 0,
-            playtime_linux_forever: 0,
+            playtime_forever: Some(100),
+            img_icon_url: Some("icon_url".to_string()),
             rtime_last_played: 0,
-            playtime_disconnected: 0,
         }
     }
 
@@ -329,6 +332,7 @@ mod tests {
             achieved,
             unlocktime,
             global_percent: None,
+            grade: Some(TrophyGrade::Gold),
         }
     }
 
@@ -337,8 +341,8 @@ mod tests {
         let game = create_mock_game();
         let displayable_game = DisplayableGame { game };
 
-        let formatted = displayable_game.format("n (i)");
-        assert_eq!(formatted, "Test Game (123)");
+        let formatted = displayable_game.format("n (i) [p]");
+        assert_eq!(formatted, "Test Game (steam:123) [steam]");
     }
 
     #[test]
@@ -346,10 +350,10 @@ mod tests {
         let achievement = create_mock_achievement(1, 1672531200); // 2023-01-01 00:00:00
         let displayable_achievement = DisplayableAchievement { achievement };
 
-        let formatted = displayable_achievement.format("i: n - s, t, d");
+        let formatted = displayable_achievement.format("i: n - s, t, d [g]");
         assert_eq!(
             formatted,
-            "test_api: Test Achievement - Y, 2023-01-01 00:00:00, Test Description"
+            "test_api: Test Achievement - Y, 2023-01-01 00:00:00, Test Description [Gold]"
         );
     }
 
@@ -405,7 +409,7 @@ mod tests {
         Renderer::render(view_data, &mut buf).unwrap();
         let output = String::from_utf8(buf).unwrap();
         assert!(output.contains("Displaying games filtered by: test"));
-        assert!(output.contains("Test Game (123)"));
+        assert!(output.contains("Test Game (steam:123)"));
     }
 
     #[test]
@@ -415,7 +419,7 @@ mod tests {
         Renderer::render(view_data, &mut buf).unwrap();
         let output = String::from_utf8(buf).unwrap();
         assert!(output.contains("Displaying all games:"));
-        assert!(output.contains("Test Game (123)"));
+        assert!(output.contains("Test Game (steam:123)"));
     }
 
     #[test]

@@ -1,14 +1,15 @@
-//! Production `SteamClient` adapter: talks HTTP/JSON to the real Steam API.
+//! Production `GameLibrary` adapter: talks HTTP/JSON to the real Steam API.
 //!
 //! <purpose-start>
-//! This is the single home of wire-format knowledge (endpoint URLs, JSON
+//! This is the single home of wire-format knowledge for Steam (endpoint URLs, JSON
 //! envelope shapes, status-code interpretation, credential loading). Plugin
-//! code and plugin tests never see any of it — they only see `SteamClient`
+//! code and plugin tests never see any of it — they only see `GameLibrary`
 //! and its domain types.
 //! <purpose-end>
 
-use crate::steam_client::{
-    Achievement, AchievementSet, Game, GlobalAchievement, SteamClient, SteamError,
+use crate::game_library::{
+    Achievement, AchievementSet, Game, GameId, GameLibrary, GlobalAchievement, Platform,
+    PlatformError,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -51,15 +52,16 @@ struct WireGame {
 impl From<WireGame> for Game {
     fn from(g: WireGame) -> Self {
         Game {
-            appid: g.appid,
+            id: GameId::Steam(g.appid),
+            platform: Platform::Steam,
             name: g.name,
-            playtime_forever: g.playtime_forever,
-            img_icon_url: g.img_icon_url,
-            playtime_windows_forever: g.playtime_windows_forever,
-            playtime_mac_forever: g.playtime_mac_forever,
-            playtime_linux_forever: g.playtime_linux_forever,
+            playtime_forever: Some(g.playtime_forever),
+            img_icon_url: if g.img_icon_url.is_empty() {
+                None
+            } else {
+                Some(g.img_icon_url)
+            },
             rtime_last_played: g.rtime_last_played,
-            playtime_disconnected: g.playtime_disconnected,
         }
     }
 }
@@ -99,6 +101,7 @@ impl From<WireAchievement> for Achievement {
             name: a.name,
             description: a.description,
             global_percent: None,
+            grade: None,
         }
     }
 }
@@ -187,7 +190,7 @@ impl From<WireGlobalAchievement> for GlobalAchievement {
     }
 }
 
-// Production `SteamClient` adapter.
+// Production `GameLibrary` adapter for Steam.
 pub struct HttpSteamClient {
     api_key: String,
     steam_id: String,
@@ -196,7 +199,7 @@ pub struct HttpSteamClient {
 }
 
 impl HttpSteamClient {
-    // Builds a client from `TROGUE_STEAM_API_KEY` / `TROGUE_STEAM_ID`.
+    // Loads credentials from environment variables and constructs a client.
     //
     // <purpose-start>
     // Folds in what used to be `Cfg`'s two-phase env load: a `HttpSteamClient`
@@ -210,18 +213,18 @@ impl HttpSteamClient {
     //
     // <outputs-start>
     // - `Ok(Self)` when both environment variables are present.
-    // - `Err(SteamError::Config)` naming the missing variable.
+    // - `Err(PlatformError::Config)` naming the missing variable.
     // <outputs-end>
     //
     // <side-effects-start>
     // - Reads environment variables.
     // <side-effects-end>
-    pub fn from_env() -> Result<Self, SteamError> {
+    pub fn from_env() -> Result<Self, PlatformError> {
         let api_key = env::var("TROGUE_STEAM_API_KEY").map_err(|_| {
-            SteamError::Config("Missing TROGUE_STEAM_API_KEY environment variable.".to_string())
+            PlatformError::Config("Missing TROGUE_STEAM_API_KEY environment variable.".to_string())
         })?;
         let steam_id = env::var("TROGUE_STEAM_ID").map_err(|_| {
-            SteamError::Config("Missing TROGUE_STEAM_ID environment variable.".to_string())
+            PlatformError::Config("Missing TROGUE_STEAM_ID environment variable.".to_string())
         })?;
 
         Ok(Self {
@@ -250,11 +253,13 @@ impl HttpSteamClient {
     // stats for this app", 403 means "profile is private") that a generic
     // `reqwest::Error` would otherwise flatten into unreadable prose.
     // <purpose-end>
-    fn map_status_error(status: reqwest::StatusCode, appid: Option<u32>) -> SteamError {
+    fn map_status_error(status: reqwest::StatusCode, appid: Option<u32>) -> PlatformError {
         match (status.as_u16(), appid) {
-            (403, _) => SteamError::PrivateProfile,
-            (400, Some(appid)) => SteamError::NoStats { appid },
-            (code, _) => SteamError::Http {
+            (403, _) => PlatformError::PrivateProfile,
+            (400, Some(appid)) => PlatformError::NoStats {
+                id: GameId::Steam(appid),
+            },
+            (code, _) => PlatformError::Http {
                 status: Some(code),
                 msg: status
                     .canonical_reason()
@@ -268,9 +273,9 @@ impl HttpSteamClient {
     // URL's query string carries `key=<TROGUE_STEAM_API_KEY>` and this
     // message is printed verbatim by every plugin and by the interactive
     // TUI's error area.
-    fn map_transport_error(e: reqwest::Error) -> SteamError {
+    fn map_transport_error(e: reqwest::Error) -> PlatformError {
         let status = e.status().map(|s| s.as_u16());
-        SteamError::Http {
+        PlatformError::Http {
             status,
             msg: e.without_url().to_string(),
         }
@@ -278,8 +283,12 @@ impl HttpSteamClient {
 }
 
 #[async_trait]
-impl SteamClient for HttpSteamClient {
-    async fn owned_games(&self) -> Result<Vec<Game>, SteamError> {
+impl GameLibrary for HttpSteamClient {
+    fn platform(&self) -> Platform {
+        Platform::Steam
+    }
+
+    async fn owned_games(&self) -> Result<Vec<Game>, PlatformError> {
         let url = format!(
             "{}/IPlayerService/GetOwnedGames/v0001/?key={}&steamid={}&format=json&include_appinfo=1",
             self.base_url, self.api_key, self.steam_id
@@ -300,12 +309,17 @@ impl SteamClient for HttpSteamClient {
         let data: GamesListResponse = response
             .json()
             .await
-            .map_err(|e| SteamError::Decode(e.to_string()))?;
+            .map_err(|e| PlatformError::Decode(e.to_string()))?;
 
         Ok(data.response.games.into_iter().map(Game::from).collect())
     }
 
-    async fn achievements(&self, appid: u32) -> Result<AchievementSet, SteamError> {
+    async fn achievements(&self, id: &GameId) -> Result<AchievementSet, PlatformError> {
+        let appid = match id {
+            GameId::Steam(appid) => *appid,
+            GameId::Psn(_) => return Err(PlatformError::NoStats { id: id.clone() }),
+        };
+
         let url = format!(
             "{}/ISteamUserStats/GetPlayerAchievements/v0001/?appid={appid}&key={}&steamid={}&l=en",
             self.base_url, self.api_key, self.steam_id
@@ -326,10 +340,10 @@ impl SteamClient for HttpSteamClient {
         let data: PlayerStatsResponse = response
             .json()
             .await
-            .map_err(|e| SteamError::Decode(e.to_string()))?;
+            .map_err(|e| PlatformError::Decode(e.to_string()))?;
 
         if !data.playerstats.success {
-            return Err(SteamError::PrivateProfile);
+            return Err(PlatformError::PrivateProfile);
         }
 
         Ok(AchievementSet {
@@ -343,7 +357,15 @@ impl SteamClient for HttpSteamClient {
         })
     }
 
-    async fn global_percentages(&self, appid: u32) -> Result<Vec<GlobalAchievement>, SteamError> {
+    async fn global_percentages(
+        &self,
+        id: &GameId,
+    ) -> Result<Vec<GlobalAchievement>, PlatformError> {
+        let appid = match id {
+            GameId::Steam(appid) => *appid,
+            GameId::Psn(_) => return Ok(Vec::new()),
+        };
+
         let url = format!(
             "{}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid={appid}&format=json&l=en",
             self.base_url
@@ -364,7 +386,7 @@ impl SteamClient for HttpSteamClient {
         let data: GlobalAchievementsResponse = response
             .json()
             .await
-            .map_err(|e| SteamError::Decode(e.to_string()))?;
+            .map_err(|e| PlatformError::Decode(e.to_string()))?;
 
         Ok(data
             .achievementpercentages
@@ -384,35 +406,45 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+        let json_body = serde_json::json!({
+            "response": {
+                "game_count": 1,
+                "games": [
+                    {
+                        "appid": 440,
+                        "name": "Team Fortress 2",
+                        "playtime_forever": 100,
+                        "img_icon_url": "icon_url",
+                        "playtime_windows_forever": 100,
+                        "playtime_mac_forever": 0,
+                        "playtime_linux_forever": 0,
+                        "rtime_last_played": 1600000000u64,
+                        "playtime_disconnected": 0
+                    }
+                ]
+            }
+        });
+
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
-                "response": {
-                    "game_count": 1,
-                    "games": [
-                        {
-                            "appid": 1,
-                            "name": "Test Game",
-                            "playtime_forever": 100,
-                            "img_icon_url": "",
-                            "playtime_windows_forever": 100,
-                            "playtime_mac_forever": 0,
-                            "playtime_linux_forever": 0,
-                            "rtime_last_played": 0,
-                            "playtime_disconnected": 0
-                        }
-                    ]
-                }
-            }"#)
-            .create_async().await;
+            .with_body(json_body.to_string())
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
         let games = client.owned_games().await.unwrap();
 
+        mock.assert_async().await;
         assert_eq!(games.len(), 1);
-        assert_eq!(games[0].name, "Test Game");
+        assert_eq!(games[0].id, GameId::Steam(440));
+        assert_eq!(games[0].platform, Platform::Steam);
+        assert_eq!(games[0].name, "Team Fortress 2");
+        assert_eq!(games[0].playtime_forever, Some(100));
+        assert_eq!(games[0].img_icon_url, Some("icon_url".to_string()));
+        assert_eq!(games[0].rtime_last_played, 1600000000);
     }
 
     #[tokio::test]
@@ -420,17 +452,21 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/IPlayerService/GetOwnedGames/v0001/?key=test_key&steamid=test_id&format=json&include_appinfo=1")
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(500)
-            .create_async().await;
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
         let result = client.owned_games().await;
 
+        mock.assert_async().await;
+        assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(SteamError::Http {
+            Err(PlatformError::Http {
                 status: Some(500),
                 ..
             })
@@ -442,34 +478,42 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=1&key=test_key&steamid=test_id&l=en")
+        let json_body = serde_json::json!({
+            "playerstats": {
+                "steamID": "76561198000000000",
+                "gameName": "Team Fortress 2",
+                "achievements": [
+                    {
+                        "apiname": "TF_GET_HEADS",
+                        "achieved": 1,
+                        "unlocktime": 1600000000u64,
+                        "name": "Headhunter",
+                        "description": "Decapitate 50 enemies."
+                    }
+                ],
+                "success": true
+            }
+        });
+
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
-                "playerstats": {
-                    "steamID": "test_id",
-                    "gameName": "Test Game",
-                    "achievements": [
-                        {
-                            "apiname": "test_ach",
-                            "achieved": 1,
-                            "unlocktime": 0,
-                            "name": "Test Achievement",
-                            "description": "A test achievement"
-                        }
-                    ],
-                    "success": true
-                }
-            }"#)
-            .create_async().await;
+            .with_body(json_body.to_string())
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
-        let set = client.achievements(1).await.unwrap();
+        let set = client.achievements(&GameId::Steam(440)).await.unwrap();
 
-        assert_eq!(set.game_name, "Test Game");
+        mock.assert_async().await;
+        assert_eq!(set.game_name, "Team Fortress 2");
         assert_eq!(set.achievements.len(), 1);
-        assert_eq!(set.achievements[0].name, "Test Achievement");
+        assert_eq!(set.achievements[0].apiname, "TF_GET_HEADS");
+        assert_eq!(set.achievements[0].achieved, 1);
+        assert_eq!(set.achievements[0].name, "Headhunter");
+        assert_eq!(set.achievements[0].description, "Decapitate 50 enemies.");
     }
 
     #[tokio::test]
@@ -477,15 +521,18 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=1&key=test_key&steamid=test_id&l=en")
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(403)
-            .create_async().await;
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
-        let result = client.achievements(1).await;
+        let result = client.achievements(&GameId::Steam(440)).await;
 
-        assert!(matches!(result, Err(SteamError::PrivateProfile)));
+        mock.assert_async().await;
+        assert!(matches!(result, Err(PlatformError::PrivateProfile)));
     }
 
     #[tokio::test]
@@ -493,15 +540,21 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/ISteamUserStats/GetPlayerAchievements/v0001/?appid=1&key=test_key&steamid=test_id&l=en")
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(400)
-            .create_async().await;
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
-        let result = client.achievements(1).await;
+        let result = client.achievements(&GameId::Steam(1)).await;
 
-        assert!(matches!(result, Err(SteamError::NoStats { appid: 1 })));
+        mock.assert_async().await;
+        assert!(matches!(
+            result,
+            Err(PlatformError::NoStats { id }) if id == GameId::Steam(1)
+        ));
     }
 
     #[tokio::test]
@@ -509,28 +562,36 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=1&format=json&l=en")
+        let json_body = serde_json::json!({
+            "achievementpercentages": {
+                "achievements": [
+                    {
+                        "name": "TF_GET_HEADS",
+                        "percent": 12.5
+                    }
+                ]
+            }
+        });
+
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
-                "achievementpercentages": {
-                    "achievements": [
-                        {
-                            "name": "test_ach",
-                            "percent": "50.5"
-                        }
-                    ]
-                }
-            }"#)
-            .create_async().await;
+            .with_body(json_body.to_string())
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
-        let achievements = client.global_percentages(1).await.unwrap();
+        let globals = client
+            .global_percentages(&GameId::Steam(440))
+            .await
+            .unwrap();
 
-        assert_eq!(achievements.len(), 1);
-        assert_eq!(achievements[0].name, "test_ach");
-        assert_eq!(achievements[0].percent, 50.5);
+        mock.assert_async().await;
+        assert_eq!(globals.len(), 1);
+        assert_eq!(globals[0].name, "TF_GET_HEADS");
+        assert_eq!(globals[0].percent, 12.5);
     }
 
     #[tokio::test]
@@ -538,28 +599,35 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=1&format=json&l=en")
+        let json_body = serde_json::json!({
+            "achievementpercentages": {
+                "achievements": [
+                    {
+                        "name": "TF_GET_HEADS",
+                        "percent": "12.5"
+                    }
+                ]
+            }
+        });
+
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
-                "achievementpercentages": {
-                    "achievements": [
-                        {
-                            "name": "test_ach",
-                            "percent": 50.5
-                        }
-                    ]
-                }
-            }"#)
-            .create_async().await;
+            .with_body(json_body.to_string())
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
-        let achievements = client.global_percentages(1).await.unwrap();
+        let globals = client
+            .global_percentages(&GameId::Steam(440))
+            .await
+            .unwrap();
 
-        assert_eq!(achievements.len(), 1);
-        assert_eq!(achievements[0].name, "test_ach");
-        assert_eq!(achievements[0].percent, 50.5);
+        mock.assert_async().await;
+        assert_eq!(globals.len(), 1);
+        assert_eq!(globals[0].percent, 12.5);
     }
 
     #[tokio::test]
@@ -567,37 +635,42 @@ mod tests {
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
-        let _m = server.mock("GET", "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=1&format=json&l=en")
+        let mock = server
+            .mock("GET", mockito::Matcher::Any)
             .with_status(500)
-            .create_async().await;
+            .create_async()
+            .await;
 
         let client =
             HttpSteamClient::with_base_url("test_key".to_string(), "test_id".to_string(), url);
-        let result = client.global_percentages(1).await;
+        let result = client.global_percentages(&GameId::Steam(440)).await;
 
-        assert!(result.is_err());
+        mock.assert_async().await;
+        assert!(matches!(
+            result,
+            Err(PlatformError::Http {
+                status: Some(500),
+                ..
+            })
+        ));
     }
 
-    // A transport-level failure (no server listening) exercises
-    // `map_transport_error`'s `Display` string, which is what plugins and the
-    // interactive TUI print verbatim. It must never contain the API key,
-    // which the request URL's query string otherwise carries.
     #[tokio::test]
     async fn test_transport_error_never_leaks_api_key() {
+        let secret_key = "super_secret_steam_api_key_12345";
         let client = HttpSteamClient::with_base_url(
-            "super_secret_key".to_string(),
+            secret_key.to_string(),
             "test_id".to_string(),
             "http://127.0.0.1:1".to_string(),
         );
 
-        let result = client.owned_games().await;
+        let err = client.owned_games().await.unwrap_err();
+        let err_msg = err.to_string();
 
-        let err = result.expect_err("connecting to a closed port must fail");
-        let message = err.to_string();
         assert!(
-            !message.contains("super_secret_key"),
-            "error message leaked the API key: {}",
-            message
+            !err_msg.contains(secret_key),
+            "Error message leaked API key: {}",
+            err_msg
         );
     }
 }

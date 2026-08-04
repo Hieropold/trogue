@@ -91,7 +91,7 @@ failure mid-command.
 
 ## Proposed slicing
 
-### Slice 1 — Platform-neutral refactor (no PSN yet)
+### Slice 1 — Platform-neutral refactor (no PSN yet) (Completed)
 Pure refactor. Tests stay green, no new deps, no network change. Shippable on its own.
 
 - `src/steam_client.rs` → `src/game_library.rs`: `SteamClient` → `GameLibrary`,

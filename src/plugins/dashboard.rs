@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `steam`: The Steam client seam, providing access to owned games and achievement data.
+//! - `steam`: The `GameLibrary` seam, providing access to owned games and achievement data.
 //! - `_matches`: The command-line arguments parsed by `clap` (unused in this plugin).
 //! <inputs-end>
 //!
@@ -15,10 +15,11 @@
 //! <outputs-end>
 //!
 //! <side-effects-start>
-//! - Makes multiple network requests to the Steam API to fetch game lists and achievement data.
+//! - Makes multiple network requests to platform APIs to fetch game lists and achievement data.
 //! <side-effects-end>
 
-use crate::{plugins::Plugin, steam_client::SteamClient};
+use crate::game_library::GameLibrary;
+use crate::plugins::Plugin;
 use async_trait::async_trait;
 use clap::Command;
 use std::io::Write;
@@ -59,7 +60,7 @@ impl Plugin for DashboardPlugin {
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `steam`: The Steam client seam.
+    // - `steam`: The `GameLibrary` seam.
     // - `_matches`: The clap argument matches for the `dashboard` subcommand (unused).
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error.
@@ -70,12 +71,12 @@ impl Plugin for DashboardPlugin {
     // <outputs-end>
     //
     // <side-effects-start>
-    // - Makes multiple network requests to the Steam API to fetch game and achievement data.
+    // - Makes multiple network requests to platform APIs to fetch game and achievement data.
     // - Writes the dashboard to the provided writer.
     // <side-effects-end>
     async fn execute(
         &self,
-        steam: &dyn SteamClient,
+        steam: &dyn GameLibrary,
         _matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         err_writer: &mut (dyn Write + Send),
@@ -110,7 +111,7 @@ impl Plugin for DashboardPlugin {
         writeln!(writer, "{}", "=".repeat(box_width)).unwrap();
 
         for game in recent_games {
-            let achievements = match steam.achievements(game.appid).await {
+            let achievements = match steam.achievements(&game.id).await {
                 Ok(set) => {
                     writeln!(writer, "{}", set.game_name).unwrap();
                     set.achievements
@@ -150,21 +151,18 @@ impl Plugin for DashboardPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::steam_client::fake::FakeSteam;
-    use crate::steam_client::{Achievement, AchievementSet, Game, SteamError};
+    use crate::game_library::fake::FakeLibrary;
+    use crate::game_library::{Achievement, AchievementSet, Game, GameId, Platform, PlatformError};
     use clap::ArgMatches;
 
     fn create_mock_game(appid: u32, name: &str, rtime_last_played: u64) -> Game {
         Game {
-            appid,
+            id: GameId::Steam(appid),
+            platform: Platform::Steam,
             name: name.to_string(),
-            playtime_forever: 0,
-            img_icon_url: "".to_string(),
-            playtime_windows_forever: 0,
-            playtime_mac_forever: 0,
-            playtime_linux_forever: 0,
+            playtime_forever: Some(0),
+            img_icon_url: None,
             rtime_last_played,
-            playtime_disconnected: 0,
         }
     }
 
@@ -176,6 +174,7 @@ mod tests {
             achieved,
             unlocktime: 0,
             global_percent: None,
+            grade: None,
         }
     }
 
@@ -193,7 +192,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_success() {
-        let steam = FakeSteam::new()
+        let steam = FakeLibrary::new()
             .with_games(vec![
                 create_mock_game(1, "Game 1", 100),
                 create_mock_game(2, "Game 2", 200),
@@ -230,7 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_get_games_list_api_error() {
-        let steam = FakeSteam::new().with_games_error(SteamError::Http {
+        let steam = FakeLibrary::new().with_games_error(PlatformError::Http {
             status: Some(500),
             msg: "boom".to_string(),
         });
@@ -243,13 +242,13 @@ mod tests {
             .await;
 
         let err_output = String::from_utf8(err_writer).unwrap();
-        assert!(err_output.contains("Steam API request failed"));
+        assert!(err_output.contains("API request failed"));
     }
 
     #[tokio::test]
     async fn test_execute_get_game_achievements_api_error() {
-        let steam = FakeSteam::new().with_games(vec![create_mock_game(1, "Game 1", 100)]);
-        // No achievements registered for appid 1 -> FakeSteam returns NoStats.
+        let steam = FakeLibrary::new().with_games(vec![create_mock_game(1, "Game 1", 100)]);
+        // No achievements registered for appid 1 -> FakeLibrary returns NoStats.
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -264,7 +263,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_no_games() {
-        let steam = FakeSteam::new().with_games(vec![]);
+        let steam = FakeLibrary::new().with_games(vec![]);
         let matches = get_matches_for_args(&["dashboard"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -280,7 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_game_with_no_achievements() {
-        let steam = FakeSteam::new()
+        let steam = FakeLibrary::new()
             .with_games(vec![create_mock_game(1, "Game 1", 100)])
             .with_achievements(
                 1,

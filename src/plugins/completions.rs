@@ -6,7 +6,7 @@
 //! <purpose-end>
 //!
 //! <inputs-start>
-//! - `steam`: The Steam client seam (not used by this plugin).
+//! - `steam`: The `GameLibrary` seam (not used by this plugin).
 //! - `matches`: The command-line arguments parsed by `clap`, containing the shell type.
 //! <inputs-end>
 //!
@@ -18,7 +18,7 @@
 //! - Writes the completion script to the provided writer (stdout).
 //! <side-effects-end>
 
-use crate::{plugins::Plugin, steam_client::SteamClient};
+use crate::{game_library::GameLibrary, plugins::Plugin};
 use async_trait::async_trait;
 use clap::{Arg, Command, ValueEnum};
 use clap_complete::{Shell, generate};
@@ -99,7 +99,7 @@ impl Plugin for CompletionsPlugin {
     //
     // <inputs-start>
     // - `&self`: A reference to the plugin instance.
-    // - `_steam`: The Steam client seam (unused by this plugin).
+    // - `_steam`: The `GameLibrary` seam (unused by this plugin).
     // - `matches`: The clap argument matches for the `completions` subcommand.
     // - `writer`: A mutable reference to a writer for standard output.
     // - `err_writer`: A mutable reference to a writer for standard error (unused).
@@ -115,7 +115,7 @@ impl Plugin for CompletionsPlugin {
     // <side-effects-end>
     async fn execute(
         &self,
-        _steam: &dyn SteamClient,
+        _steam: &dyn GameLibrary,
         matches: &clap::ArgMatches,
         writer: &mut (dyn Write + Send),
         _err_writer: &mut (dyn Write + Send),
@@ -126,7 +126,7 @@ impl Plugin for CompletionsPlugin {
         let mut cmd = Command::new("trogue")
             .version("1.0")
             .author("Hieropold <hieropold@gmail.com>")
-            .about("A CLI tool for displaying Steam achievements");
+            .about("A CLI tool for displaying game achievements");
 
         // Add all plugin commands
         for plugin in crate::plugins::get_plugins() {
@@ -148,7 +148,7 @@ impl Plugin for CompletionsPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::steam_client::fake::FakeSteam;
+    use crate::game_library::fake::FakeLibrary;
     use clap::ArgMatches;
 
     fn get_matches_for_args(args: &[&str]) -> ArgMatches {
@@ -166,7 +166,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_bash() {
-        let steam = FakeSteam::new();
+        let steam = FakeLibrary::new();
         let matches = get_matches_for_args(&["completions", "bash"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -182,7 +182,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_zsh() {
-        let steam = FakeSteam::new();
+        let steam = FakeLibrary::new();
         let matches = get_matches_for_args(&["completions", "zsh"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -198,7 +198,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_fish() {
-        let steam = FakeSteam::new();
+        let steam = FakeLibrary::new();
         let matches = get_matches_for_args(&["completions", "fish"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
@@ -214,7 +214,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_powershell() {
-        let steam = FakeSteam::new();
+        let steam = FakeLibrary::new();
         let matches = get_matches_for_args(&["completions", "power-shell"]);
         let mut writer = Vec::new();
         let mut err_writer = Vec::new();
