@@ -52,7 +52,7 @@ jobs:
       # — those tags are deliberately rewritten on every new tool release,
       # which is the opposite of a pin.
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
         with:
           tool: cargo-llvm-cov
 
@@ -60,7 +60,7 @@ jobs:
         run: cargo llvm-cov --summary-only --fail-under-lines 79
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
         with:
           tool: cargo-audit
 
